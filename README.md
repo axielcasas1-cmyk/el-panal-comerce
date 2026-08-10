@@ -1,2 +1,5 @@
-# el-panal-comerce
-Aplicación privada de gestión comercial y acceso seguro de EL PANAL.
+# Bolsa de Ideas — RC1
+
+Publicación estable de la PWA Bolsa de Ideas.
+
+Estado: RC1 comercial en validación.
