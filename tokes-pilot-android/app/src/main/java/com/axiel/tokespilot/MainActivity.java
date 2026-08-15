@@ -2,12 +2,12 @@ package com.axiel.tokespilot;
 
 import android.app.Activity;
 import android.graphics.Color;
-import android.nfc.Ndef;
-import android.nfc.NdefFormatable;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
 import android.nfc.NfcAdapter;
 import android.nfc.Tag;
+import android.nfc.tech.Ndef;
+import android.nfc.tech.NdefFormatable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
