@@ -31,14 +31,18 @@ jobs:
           from pathlib import Path
           import base64, gzip, hashlib
           d=Path('dragolaida-android-app/clean_chunks')
-          names=['chunk01.txt','chunk02.txt','chunk03.txt','chunk04.txt','fix05a.txt','fix05b.txt','chunk06.txt','fix07a.txt','fix07b.txt','fix08a.txt','fix08b1.txt','fix08b2.txt','chunk09.txt']
-          payload=''.join((d/n).read_text(encoding='utf-8') for n in names)
+          def r(n): return (d/n).read_text(encoding='utf-8')
+          pieces=[r('chunk01.txt'),r('chunk02.txt'),r('chunk03.txt'),r('chunk04.txt'),r('fix05a.txt'),r('fix05b.txt'),r('chunk06.txt'),r('fix07a.txt'),r('fix07b.txt')[:8000],r('fix08a.txt')[:8000],r('fix08b1.txt'),r('fix08b2.txt'),r('chunk09.txt')]
+          payload=''.join(pieces)
           assert len(payload)==134312, f'Unexpected Base64 length: {len(payload)}'
-          assert hashlib.sha256(payload.encode()).hexdigest()=='d19b76db931cab0fd629a463afe01095ea0ce8227e900b7f8184002a88837212', 'Base64 SHA mismatch'
+          actual=hashlib.sha256(payload.encode()).hexdigest()
+          assert actual=='d19b76db931cab0fd629a463afe01095ea0ce8227e900b7f8184002a88837212', f'Base64 SHA mismatch: {actual}'
           compressed=base64.b64decode(payload)
-          assert hashlib.sha256(compressed).hexdigest()=='c6f130b4b30b101957718c9b73be6df5add842d8c804d825737ff0ba937e87b6', 'Gzip SHA mismatch'
+          actual_gz=hashlib.sha256(compressed).hexdigest()
+          assert actual_gz=='c6f130b4b30b101957718c9b73be6df5add842d8c804d825737ff0ba937e87b6', f'Gzip SHA mismatch: {actual_gz}'
           data=gzip.decompress(compressed)
-          assert hashlib.sha256(data).hexdigest()=='65dd801bef902a6891da89c95f5f62bf106802b4bc01f0e08aeb9d654e5cd5e3', 'HTML SHA mismatch'
+          actual_html=hashlib.sha256(data).hexdigest()
+          assert actual_html=='65dd801bef902a6891da89c95f5f62bf106802b4bc01f0e08aeb9d654e5cd5e3', f'HTML SHA mismatch: {actual_html}'
           text=data.decode('utf-8')
           assert 'DRAGOLAIDA CASAS' in text
           assert len(data)==261571, f'Unexpected HTML size: {len(data)}'
