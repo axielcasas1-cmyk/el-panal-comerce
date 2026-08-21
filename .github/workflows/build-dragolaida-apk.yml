@@ -27,10 +27,53 @@ jobs:
           sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Rebuild embedded offline library
         run: |
-          mkdir -p dragolaida-android-app/app/src/main/assets
-          cat dragolaida-android-app/asset_chunks/part*.txt | base64 -d | gunzip > dragolaida-android-app/app/src/main/assets/index.html
-          test -s dragolaida-android-app/app/src/main/assets/index.html
-          grep -q "DRAGOLAIDA CASAS" dragolaida-android-app/app/src/main/assets/index.html
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64, gzip, re
+
+          parts = sorted(Path('dragolaida-android-app/asset_chunks').glob('part*.txt'))
+          assert parts, 'No asset chunks found'
+          target = Path('dragolaida-android-app/app/src/main/assets/index.html')
+          target.parent.mkdir(parents=True, exist_ok=True)
+
+          def clean(s):
+              return re.sub(r'\s+', '', s)
+          def b64(s):
+              s = clean(s)
+              s += '=' * ((4 - len(s) % 4) % 4)
+              return base64.b64decode(s, validate=False)
+
+          errors=[]
+          # Mode 1: chunks are slices of one Base64 stream.
+          try:
+              joined = ''.join(clean(p.read_text(encoding='utf-8')) for p in parts)
+              data = gzip.decompress(b64(joined))
+              target.write_bytes(data)
+              print('Recovered as concatenated Base64 stream')
+          except Exception as e:
+              errors.append(('joined', repr(e)))
+              # Mode 2: chunks were Base64-encoded separately from consecutive gzip bytes.
+              try:
+                  compressed = b''.join(b64(p.read_text(encoding='utf-8')) for p in parts)
+                  data = gzip.decompress(compressed)
+                  target.write_bytes(data)
+                  print('Recovered as separately encoded binary chunks')
+              except Exception as e2:
+                  errors.append(('separate-binary', repr(e2)))
+                  # Mode 3: each chunk is an independent gzip member containing consecutive HTML text.
+                  try:
+                      data = b''.join(gzip.decompress(b64(p.read_text(encoding='utf-8'))) for p in parts)
+                      target.write_bytes(data)
+                      print('Recovered as independent gzip members')
+                  except Exception as e3:
+                      errors.append(('gzip-members', repr(e3)))
+                      raise RuntimeError('Unable to reconstruct offline library: '+repr(errors))
+
+          text = target.read_text(encoding='utf-8')
+          assert 'DRAGOLAIDA CASAS' in text, 'Brand marker missing in reconstructed app'
+          assert len(text) > 10000, 'Reconstructed app is unexpectedly small'
+          print('DRAGOLAIDA offline app recovered:', len(text), 'characters from', len(parts), 'chunks')
+          PY
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
