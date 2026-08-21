@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "library": "La Biblioteca de La Adela",
+  "version": 1,
+  "updated_at": "2026-08-21T05:40:00Z",
+  "language": "es",
+  "books": [
+    {
+      "id": "bienvenida-adela",
+      "title": "Bienvenida, La Adela",
+      "author": "La Biblioteca de La Adela",
+      "version": 1,
+      "description": "Mensaje de bienvenida y prueba de narración.",
+      "cover": "",
+      "chapters": [
+        {
+          "id": "bienvenida",
+          "title": "Un mensaje para ti",
+          "text": "Hola, Adelaida. Bienvenida a La Biblioteca de La Adela. Esta biblioteca está hecha para que escuchar una historia sea tan sencillo como tocar un botón. Cuando haya internet, buscará nuevos libros automáticamente. Cuando no haya conexión, los libros que ya tengas descargados seguirán contigo. Pulsa Escuchar y disfruta de la lectura a tu ritmo."
+        }
+      ]
+    }
+  ]
+}
