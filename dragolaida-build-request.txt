@@ -1,1 +1,1 @@
-Trigger limpio para compilar DRAGOLAIDA CASAS Android APK.
+Trigger limpio para compilar DRAGOLAIDA CASAS Android APK. Reintento robusto 2.
