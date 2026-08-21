@@ -1,0 +1,44 @@
+name: Build DRAGOLAIDA CASAS APK
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/build-dragolaida-apk.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout DRAGOLAIDA source
+        uses: actions/checkout@v4
+        with:
+          ref: dragolaida-build-final
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Rebuild embedded offline library
+        run: |
+          mkdir -p dragolaida-android-app/app/src/main/assets
+          cat dragolaida-android-app/asset_chunks/part*.txt | base64 -d | gunzip > dragolaida-android-app/app/src/main/assets/index.html
+          test -s dragolaida-android-app/app/src/main/assets/index.html
+          grep -q "DRAGOLAIDA CASAS" dragolaida-android-app/app/src/main/assets/index.html
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build APK
+        working-directory: dragolaida-android-app
+        run: gradle assembleDebug --stacktrace
+      - name: Prepare installer
+        run: cp dragolaida-android-app/app/build/outputs/apk/debug/app-debug.apk DRAGOLAIDA-CASAS.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DRAGOLAIDA-CASAS-APK
+          path: DRAGOLAIDA-CASAS.apk
+          retention-days: 30
