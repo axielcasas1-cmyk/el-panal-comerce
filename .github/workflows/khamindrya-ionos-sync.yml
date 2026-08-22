@@ -25,7 +25,7 @@ jobs:
           curl --fail --location --retry 3 'https://share.carryo.io/yjSoUAl10GHLpLzj' -o khamindrya-ionos/index.html
           grep -q 'KHAMINDRYA NEXUS' khamindrya-ionos/index.html
           grep -q 'PUERTA DIGITAL' khamindrya-ionos/index.html
-      - name: Add PWA metadata and service worker registration
+      - name: Convert to standalone IONOS PWA
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -33,6 +33,11 @@ jobs:
           s=p.read_text(encoding='utf-8')
           if 'manifest.webmanifest' not in s:
               s=s.replace('</head>','<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"></head>')
+          # iPhone/Safari safe-area hardening. The Carryo badge is hosting UI and will not exist on IONOS.
+          s=s.replace('padding:66px 0 78px','padding:66px 0 calc(96px + env(safe-area-inset-bottom))')
+          s=s.replace('bottom:8px;left:50%', 'bottom:calc(10px + env(safe-area-inset-bottom));left:50%')
+          s=s.replace('bottom:78px;transform:translateX(-50%)','bottom:calc(86px + env(safe-area-inset-bottom));transform:translateX(-50%)')
+          s=s.replace('PUERTA DIGITAL · V1.3','PUERTA DIGITAL · IONOS READY')
           reg="<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){});});}</script>"
           if "navigator.serviceWorker.register('./sw.js')" not in s:
               s=s.replace('</body>',reg+'</body>')
@@ -44,7 +49,7 @@ jobs:
           {"name":"KHAMINDRYA NEXUS","short_name":"KHAMINDRYA","description":"Puerta digital del universo literario KHAMINDRYA","start_url":"./","scope":"./","display":"standalone","background_color":"#05070b","theme_color":"#05070b","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
           EOF
           cat > khamindrya-ionos/sw.js <<'EOF'
-          const CACHE='khamindrya-ionos-v13-20260823';const SHELL=['./','./index.html','./manifest.webmanifest','./icon.svg'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))))});
+          const CACHE='khamindrya-ionos-v13-20260823b';const SHELL=['./','./index.html','./manifest.webmanifest','./icon.svg'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))))});
           EOF
           cat > khamindrya-ionos/icon.svg <<'EOF'
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#05070b"/><circle cx="256" cy="256" r="166" fill="none" stroke="#e8c878" stroke-width="10" opacity=".6"/><circle cx="256" cy="256" r="112" fill="none" stroke="#85e6dc" stroke-width="7" stroke-dasharray="18 18"/><path d="M256 124c48 40 68 84 68 132s-20 92-68 132c-48-40-68-84-68-132s20-92 68-132z" fill="#14252d" stroke="#e8c878" stroke-width="8"/><circle cx="232" cy="216" r="14" fill="#85e6dc"/></svg>
@@ -67,6 +72,8 @@ jobs:
           test -s khamindrya-ionos/icon.svg
           grep -q 'manifest.webmanifest' khamindrya-ionos/index.html
           grep -q "serviceWorker.register('./sw.js')" khamindrya-ionos/index.html
+          grep -q 'PUERTA DIGITAL · IONOS READY' khamindrya-ionos/index.html
+          grep -q 'safe-area-inset-bottom' khamindrya-ionos/index.html
           grep -q 'KHAMINDRYA NEXUS' khamindrya-ionos/index.html
           echo 'KHAMINDRYA IONOS PWA verified'
       - name: Commit generated PWA
@@ -77,6 +84,6 @@ jobs:
           if git diff --cached --quiet; then
             echo 'No changes to commit'
           else
-            git commit -m 'build: generate KHAMINDRYA IONOS PWA'
+            git commit -m 'build: harden KHAMINDRYA IONOS PWA for iPhone'
             git push origin HEAD:khamindrya-nexus-ionos
           fi
