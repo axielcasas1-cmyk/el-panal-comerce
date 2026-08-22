@@ -1,0 +1,82 @@
+name: Build KHAMINDRYA IONOS PWA
+
+on:
+  push:
+    branches: [ khamindrya-nexus-ionos ]
+    paths:
+      - '.github/workflows/khamindrya-ionos-sync.yml'
+      - 'khamindrya-ionos-trigger.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-pwa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: khamindrya-nexus-ionos
+      - name: Fetch verified iPhone build
+        run: |
+          set -euo pipefail
+          mkdir -p khamindrya-ionos
+          curl --fail --location --retry 3 'https://share.carryo.io/yjSoUAl10GHLpLzj' -o khamindrya-ionos/index.html
+          grep -q 'KHAMINDRYA NEXUS' khamindrya-ionos/index.html
+          grep -q 'PUERTA DIGITAL' khamindrya-ionos/index.html
+      - name: Add PWA metadata and service worker registration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('khamindrya-ionos/index.html')
+          s=p.read_text(encoding='utf-8')
+          if 'manifest.webmanifest' not in s:
+              s=s.replace('</head>','<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"></head>')
+          reg="<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){});});}</script>"
+          if "navigator.serviceWorker.register('./sw.js')" not in s:
+              s=s.replace('</body>',reg+'</body>')
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Create PWA shell
+        run: |
+          cat > khamindrya-ionos/manifest.webmanifest <<'EOF'
+          {"name":"KHAMINDRYA NEXUS","short_name":"KHAMINDRYA","description":"Puerta digital del universo literario KHAMINDRYA","start_url":"./","scope":"./","display":"standalone","background_color":"#05070b","theme_color":"#05070b","icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+          EOF
+          cat > khamindrya-ionos/sw.js <<'EOF'
+          const CACHE='khamindrya-ionos-v13-20260823';const SHELL=['./','./index.html','./manifest.webmanifest','./icon.svg'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==CACHE).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))))});
+          EOF
+          cat > khamindrya-ionos/icon.svg <<'EOF'
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="96" fill="#05070b"/><circle cx="256" cy="256" r="166" fill="none" stroke="#e8c878" stroke-width="10" opacity=".6"/><circle cx="256" cy="256" r="112" fill="none" stroke="#85e6dc" stroke-width="7" stroke-dasharray="18 18"/><path d="M256 124c48 40 68 84 68 132s-20 92-68 132c-48-40-68-84-68-132s20-92 68-132z" fill="#14252d" stroke="#e8c878" stroke-width="8"/><circle cx="232" cy="216" r="14" fill="#85e6dc"/></svg>
+          EOF
+          cat > khamindrya-ionos/IONOS-DEPLOY.txt <<'EOF'
+          IONOS Deploy Now
+          Repository: axielcasas1-cmyk/el-panal-comerce
+          Production branch: khamindrya-nexus-ionos
+          Project type: Static website / SPA
+          Build command: none
+          Dist folder: khamindrya-ionos
+          Connect your IONOS domain to the Production Deployment after the first successful build.
+          EOF
+      - name: Verify output
+        run: |
+          set -euo pipefail
+          test -s khamindrya-ionos/index.html
+          test -s khamindrya-ionos/manifest.webmanifest
+          test -s khamindrya-ionos/sw.js
+          test -s khamindrya-ionos/icon.svg
+          grep -q 'manifest.webmanifest' khamindrya-ionos/index.html
+          grep -q "serviceWorker.register('./sw.js')" khamindrya-ionos/index.html
+          grep -q 'KHAMINDRYA NEXUS' khamindrya-ionos/index.html
+          echo 'KHAMINDRYA IONOS PWA verified'
+      - name: Commit generated PWA
+        run: |
+          git config user.name 'KHAMINDRYA Builder'
+          git config user.email 'actions@users.noreply.github.com'
+          git add khamindrya-ionos
+          if git diff --cached --quiet; then
+            echo 'No changes to commit'
+          else
+            git commit -m 'build: generate KHAMINDRYA IONOS PWA'
+            git push origin HEAD:khamindrya-nexus-ionos
+          fi
