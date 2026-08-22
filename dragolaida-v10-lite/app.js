@@ -1,0 +1,1 @@
+document.write('<script src="../dragolaida-v10/app.js"><\/script><script src="./lite-patch.js"><\/script>');
