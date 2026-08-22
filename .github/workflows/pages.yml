@@ -23,10 +23,26 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Verify KHAMINDRYA package
+        run: |
+          test -f khamindrya-nexus-v1/index.html
+          test -f khamindrya-nexus-v1/payload-1.txt
+          test -f khamindrya-nexus-v1/payload-2.txt
+          test -f khamindrya-nexus-v1/payload-3.txt
+          test -f khamindrya-nexus-v1/sw.js
+          test -f khamindrya-nexus-v1/manifest.webmanifest
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
           path: .
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
