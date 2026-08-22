@@ -1,0 +1,7 @@
+IONOS Deploy Now
+Repository: axielcasas1-cmyk/el-panal-comerce
+Production branch: khamindrya-nexus-ionos
+Project type: Static website / SPA
+Build command: none
+Dist folder: khamindrya-ionos
+Connect your IONOS domain to the Production Deployment after the first successful build.
