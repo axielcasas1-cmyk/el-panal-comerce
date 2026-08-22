@@ -1,0 +1,10 @@
+{
+  "name":"KHAMINDRYA NEXUS",
+  "short_name":"KHAMINDRYA",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#05070b",
+  "theme_color":"#08090e",
+  "description":"Puerta digital de lectura e inmersión del universo KHAMINDRYA.",
+  "icons":[{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
