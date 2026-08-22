@@ -1,0 +1,1 @@
+window.addEventListener('DOMContentLoaded',()=>{const d=document.getElementById('dragolaidaAvatar'),b=document.getElementById('bembaAvatar');if(d)d.src='data:image/webp;base64,'+(window.__d||'');if(b)b.src='data:image/webp;base64,'+(window.__b||'');});
