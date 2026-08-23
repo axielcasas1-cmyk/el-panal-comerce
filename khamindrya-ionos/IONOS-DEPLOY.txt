@@ -5,3 +5,4 @@ Project type: Static website / SPA
 Build command: none
 Dist folder: khamindrya-ionos
 Connect your IONOS domain to the Production Deployment after the first successful build.
+Deployment trigger: 2026-08-23 05:28 CEST
