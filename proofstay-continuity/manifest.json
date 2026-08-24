@@ -1,0 +1,19 @@
+{
+  "project": "ProofStay",
+  "release_candidate": "1.0.0-rc.2",
+  "continuity_mode": "NO_STOP",
+  "primary": {
+    "unified": "https://proofstay-unified-2026.vercel.app",
+    "operations": "https://proofstay-operations.vercel.app",
+    "admin": "https://proofstay-admin-security.vercel.app",
+    "pilot": "https://proofstay-founding-pilot.vercel.app"
+  },
+  "backend": {
+    "lovable_project": "bb06520e-f517-4ef6-8887-696ad20efc1b",
+    "current_classification": "OBSERVABILITY_DEGRADED",
+    "write_policy": "IDEMPOTENT_ONLY_NO_BLIND_RETRY"
+  },
+  "escape_routes": ["PRIMARY", "BOUNDED_RETRY", "MIRROR_FAILOVER", "LAST_KNOWN_GOOD_ROLLBACK", "SAFE_DEGRADED_MODE"],
+  "rc2_bundle_sha256": "b57befe387a58b35f4410f90aa5f13ab30ed5d9bfa9446377373b748676eaa2f",
+  "billing_blocks_release": false
+}
