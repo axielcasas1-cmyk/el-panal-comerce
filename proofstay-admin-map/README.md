@@ -1,0 +1,1 @@
+Temporary isolated continuity module for ProofStay admin map. This lives on a dedicated branch and does not alter the El Panal main application.
