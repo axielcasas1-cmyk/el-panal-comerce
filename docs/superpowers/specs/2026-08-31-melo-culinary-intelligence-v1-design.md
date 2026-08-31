@@ -1,58 +1,55 @@
 # MELO Culinary Intelligence v1 — Design
 
 ## Goal
-Convert D’GUSTEAUX from a deterministic recipe generator with adaptive post-processing into a provider-ready culinary intelligence pipeline that uses structured context, validates every generated recipe, persists normalized data, and always falls back safely to the local engine.
+Convert D’GUSTEAUX from a deterministic recipe generator with adaptive post-processing into a safe culinary intelligence pipeline that uses structured context, deterministic validation, normalized persistence and an automatic local fallback.
 
-## Existing baseline
+## Current baseline
 - Supabase project `btdekoigcfpsqteqhcnp`, isolated schema `dgusteaux`.
-- Edge route `omegalli-app/dgusteaux`, v8 ACTIVE.
-- Tables: `profiles`, `app_state`, `pantry_items`, `recipes`, `palate_profiles`, `dish_feedback`, `release_registry`.
-- Existing RPCs: state pull/push and dish rating/profile update.
-- AppDeploy snapshot remains immutable backup.
-- Vercel preview is technical backup only.
+- Existing RPCs: `dgusteaux_get_culinary_context()`, `dgusteaux_save_recipe(...)`, state pull/push and dish-rating/profile update.
+- AppDeploy snapshot `1788098154937` remains immutable backup.
+- `omegalli-app` and `omegalli-api` are now occupied by CLINICAL HOME HEALTH RN and MUST NOT be modified for D’GUSTEAUX.
+- Vercel preview remains a technical backup only.
 
 ## Architecture
-The browser sends a structured culinary context to a new public RPC/Edge API. The server builds a canonical request object containing prompt, servings, budget, time, equipment, pantry, allergies/restrictions, region and palate profile. A provider adapter is optional: if no external model is configured or the provider fails/returns invalid data, the deterministic local engine remains authoritative fallback.
+v1 is RPC-only. Authenticated clients call `public.dgusteaux_generate_recipe(p_context jsonb)`. The RPC merges explicit request context with the authenticated user profile, palate and pantry, builds a deterministic candidate recipe, sends that candidate through `public.dgusteaux_validate_recipe(p_recipe jsonb,p_context jsonb)`, and returns `{ok,source:'fallback',recipe,warnings,explanation}`.
 
-Every candidate recipe passes a deterministic Safety Gate before presentation. The gate rejects or repairs schema errors, unsafe temperature/cooking guidance, explicit allergen conflicts, impossible quantities and unsupported dangerous operations. Safety and user restrictions outrank palate preferences.
+The browser uses this RPC when authenticated and online. If authentication, Supabase or network is unavailable, the existing browser generator remains the fallback. No Edge Function slot is required and no paid provider is required. A future provider adapter may be added later behind a dedicated safe service, but v1 never claims provider/AI generation when it used deterministic fallback.
 
-The normalized tables become the durable source for authenticated users. `app_state` remains compatibility/fallback storage during migration.
+## Safety Gate
+`dgusteaux_validate_recipe` enforces these invariants before a recipe may be returned:
+1. title, ingredients and steps must exist with bounded shapes;
+2. explicit allergies/restrictions outrank palate preferences;
+3. the gate never adds ingredients to chase a palate preference;
+4. high umami or salty preference never increases salt by default;
+5. low spicy preference may only reduce heat guidance;
+6. poultry/meat/fish/egg candidates must contain explicit complete-cooking guidance when relevant;
+7. dangerous or unsupported operations are rejected;
+8. knife/heat steps carry `requiresAdultSupervision=true` so the client keeps the warning visible;
+9. if validation cannot repair a candidate conservatively, generation returns the safe deterministic fallback or fails closed.
 
 ## Interfaces
 ### `public.dgusteaux_get_culinary_context()`
-Authenticated only. Returns user palate profile, pantry rows and profile/preferences available to the culinary engine.
+Authenticated only. Returns `{profile,palate,pantry}` and never exposes another user’s rows.
 
-### `public.dgusteaux_save_recipe(p_recipe jsonb, p_source text, p_context jsonb)`
-Authenticated only. Validates ownership and stores normalized recipe JSON with source metadata. Anonymous clients remain local-only.
+### `public.dgusteaux_validate_recipe(p_recipe jsonb,p_context jsonb)`
+Authenticated only. Returns `{ok,recipe,warnings,errors}`. It performs deterministic structural, allergen/restriction and cooking-safety validation.
 
-### Edge endpoint `/dgusteaux/api/generate`
-POST JSON. Accepts a canonical culinary request. Returns `{ok, source, recipe, warnings, explanation}`. Source is `provider` or `fallback`.
+### `public.dgusteaux_generate_recipe(p_context jsonb)`
+Authenticated only. Accepts prompt, servings, budget, timeMinutes, equipment, pantry, allergies, restrictions and region. Returns `{ok,source:'fallback',recipe,warnings,explanation}`. `source` is truthful.
 
-## Provider policy
-v1 ships provider-ready but does not require or silently purchase a paid API. Provider configuration is optional and secret-backed. With no provider secret, generation uses deterministic fallback and reports `source=fallback` truthfully.
+### `public.dgusteaux_save_recipe(p_recipe jsonb,p_source text,p_context jsonb)`
+Authenticated only. Persists normalized recipe data with ownership enforced by RLS and updates a stable recipe ID rather than duplicating it.
 
-## Safety invariants
-1. Explicit allergies/restrictions are never overridden by palate learning.
-2. Palate learning never adds ingredients solely to chase a preference.
-3. High umami preference must not increase salt by default.
-4. Low spice preference can only reduce heat guidance.
-5. Risky knife/heat steps always display adult-supervision warning for minors.
-6. Provider output is never trusted before deterministic validation.
-7. If validation cannot repair a candidate safely, discard it and use fallback.
-
-## Offline and failure behavior
-- No network: local deterministic generator + localStorage/queue.
-- Supabase unavailable: local mode continues.
-- Provider unavailable/timeout/invalid output: deterministic fallback.
-- Auth absent: local-only generation; no normalized cloud write.
-
-## Observability
-Generation response exposes truthful source and validation warnings. No hidden claim of AI use when fallback was used.
+## Failure behavior
+- No auth: browser local-only generation.
+- No network/Supabase: browser local deterministic generator.
+- Invalid RPC result: discard and use browser local generator.
+- Explicit allergies/restrictions always override learned palate signals.
 
 ## Success criteria
-- Structured context round-trip works for authenticated users.
-- Provider absence produces a valid fallback recipe.
-- Invalid provider recipe cannot bypass safety gate.
-- Allergies/restrictions win over palate signals.
-- Normalized recipe persistence works under RLS.
-- Existing AppDeploy backup and Omegalli root stay healthy.
+- Context and persistence RPC permissions are verified (`authenticated=true`, `anon=false`).
+- Safety Gate rejects allergen conflicts, empty steps and unsafe incomplete poultry guidance, and accepts a safe recipe.
+- Generation returns valid JSON with `source='fallback'`, safe structured recipe and explanation.
+- Normalized persistence is idempotent for stable recipe IDs.
+- Client integration never prevents offline generation.
+- AppDeploy and CLINICAL Edge Functions remain untouched and healthy.
