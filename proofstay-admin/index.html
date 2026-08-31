@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#02110d">
+<meta name="robots" content="noindex,nofollow">
+<title>ProofStay · Administración · Radar dual</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://raw.githubusercontent.com/axielcasas1-cmyk/el-panal-comerce/proofstay-admin-map/proofstay-admin/style.css">
+</head>
+<body>
+<main class="shell">
+<header class="glass">
+<div><span class="ey">PROOFSTAY · ADMINISTRACIÓN · CONTINUIDAD SEGURA</span><h1>Radar mundial dual</h1><p>Passport y despliegue comparten cartografía, pero nunca se remontan. Selecciona la capa mediante <b>VER / VIEW</b>.</p></div>
+<div class="live"><span class="liveDot"></span><b>RADAR ACTIVO</b><small id="clock">Inicializando…</small></div>
+</header>
+
+<section id="authBox" class="auth glass">
+<label><span>Correo administrador</span><input id="email" type="email" autocomplete="username" placeholder="admin@dominio.com"></label>
+<label><span>Contraseña</span><input id="password" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+<button id="login">Entrar</button>
+<label id="otpLabel" class="hidden"><span>Código TOTP</span><input id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456"></label>
+<button id="verifyOtp" class="hidden">Verificar AAL2</button>
+<button id="logout" class="hidden">Cerrar sesión</button>
+<div id="authStatus" class="authStatus">La sesión se valida directamente contra Supabase. Esta página no almacena tu contraseña.</div>
+</section>
+
+<div class="toolbar glass">
+<button id="world">Vista mundial</button><button id="americas">Américas + Iberia</button><button id="plus">+</button><button id="minus">−</button><button id="refresh" disabled>↻ Actualizar datos reales</button>
+<span>Zoom y arrastre en tiempo real · refresco automático 60 s</span>
+</div>
+
+<section class="layout">
+<div class="mapWrap glass"><div id="map"></div><div class="radar"><div class="sweep"></div></div></div>
+<aside class="side">
+<section id="passportCard" class="card glass selected">
+<div class="cardHead"><div><span class="ey">ALOJAMIENTOS · PASSPORT</span><h3>Estado del Pasaporte</h3></div><button id="viewPassport" class="viewBtn active">VER / VIEW</button></div>
+<div class="rows">
+<div class="row"><span class="stateDot activeS"></span><span><b>Activo / vigente</b><small>Vigente &gt;30 días</small></span><strong id="nActive">0</strong></div>
+<div class="row"><span class="stateDot expiringS"></span><span><b>Por vencer</b><small>30 días o menos</small></span><strong id="nExpiring">0</strong></div>
+<div class="row"><span class="stateDot expiredS"></span><span><b>Vencido</b><small>Caducado o no vigente</small></span><strong id="nExpired">0</strong></div>
+<div class="row"><span class="stateDot pendingS"></span><span><b>Pendiente</b><small>Registrado / en revisión</small></span><strong id="nPending">0</strong></div>
+</div>
+<div id="passportHint" class="hint">Inicia sesión y completa AAL2 para cargar los puntos autorizados del backend.</div>
+</section>
+
+<section id="deploymentCard" class="card glass">
+<div class="cardHead"><div><span class="ey">DESPLIEGUE GLOBAL</span><h3>Estado territorial</h3></div><button id="viewDeployment" class="viewBtn">VER / VIEW</button></div>
+<div class="rows">
+<div class="row"><span class="sw pd">PD</span><span><b>Desplegado</b><small>Captación/piloto iniciado</small></span><strong id="cPD">0</strong></div>
+<div class="row"><span class="sw pa">PA</span><span><b>Despliegue activo</b><small>Apertura/expansión</small></span><strong id="cPA">0</strong></div>
+<div class="row"><span class="sw pf">PF</span><span><b>Falta despliegue</b><small>Pendiente</small></span><strong id="cPF">0</strong></div>
+</div>
+<div class="hint">La granularidad cambia país → ciudad/mercado al acercar.</div>
+</section>
+
+<section id="detail" class="card glass detail"><span class="ey">DETALLE</span><h3>Capa Passport</h3><p>Los alojamientos sólo aparecen cuando el backend entrega coordenadas autorizadas.</p></section>
+<section class="card glass notice"><b>Privacidad:</b> las ubicaciones y estados de Passport se consultan únicamente tras sesión administrativa y AAL2. La capa comercial PD/PA/PF está separada.</section>
+</aside>
+</section>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module" src="https://raw.githubusercontent.com/axielcasas1-cmyk/el-panal-comerce/proofstay-admin-map/proofstay-admin/app.js"></script>
+</body></html>
