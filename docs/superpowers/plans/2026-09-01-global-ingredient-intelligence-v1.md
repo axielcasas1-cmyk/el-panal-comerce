@@ -4,70 +4,65 @@
 
 **Goal:** Build a Spain-first, globally extensible ingredient intelligence subsystem that lets MELO search, explain, substitute and validate ingredients with explicit provenance, confidence and allergen safety.
 
-**Architecture:** Add normalized D’GUSTEAUX-owned tables and authenticated SECURITY INVOKER RPCs in Supabase, keep verified Spanish seed data in versioned source files, and expose the subsystem through small browser modules for RPC access, bounded offline caching and UI rendering. MELO continues to use the existing Safety Gate; ingredient-aware safety evidence is added as a pre-validation layer and every adapted recipe still passes `dgusteaux_validate_recipe` before display.
+**Architecture:** Add normalized D’GUSTEAUX-owned tables and authenticated SECURITY INVOKER RPCs in Supabase; keep Spanish seed data in versioned, source-backed files; expose the subsystem through small browser modules for RPC access, offline cache and UI. Ingredient-aware safety evidence is introduced through a separate versioned Safety Gate bridge migration; every adapted recipe still passes `dgusteaux_validate_recipe`.
 
-**Tech Stack:** PostgreSQL/Supabase, PL/pgSQL RPCs, vanilla ES modules, Node `node:test`, single-file static D’GUSTEAUX build packaged as gzip/base64 payload for the isolated Vercel preview.
+**Tech Stack:** PostgreSQL/Supabase, PL/pgSQL, vanilla ES modules, Node `node:test`, static single-file D’GUSTEAUX build packaged as gzip/base64 for the isolated Vercel preview.
 
 **Spec:** `docs/superpowers/specs/2026-09-01-global-ingredient-intelligence-v1-design.md`
 
 ## Global Constraints
 
-- Initial verified content focuses on ingredients available in Spain; territory model must remain global-ready.
-- `LOW` and `UNVERIFIED` data must never be rendered as established fact.
-- A substitution can be called safe for a declared allergy/restriction only when evidence for that exact condition is `VERIFIED` or `HIGH`.
-- Missing allergen evidence is never treated as evidence of safety.
-- Ingredient-intelligence RPC execution: `authenticated=true`, `service_role=true`, `anon=false`, `public=false`.
+- Spain-first content; country/subdivision model remains global-ready.
+- `LOW` and `UNVERIFIED` are never rendered as established fact.
+- A substitute is called safe for a declared allergy/restriction only with `VERIFIED` or `HIGH` evidence for that exact condition.
+- Missing allergen evidence is never evidence of safety.
+- Ingredient RPCs: `authenticated=true`, `service_role=true`, `anon=false`, `public=false`.
 - Catalogue writes are not exposed to ordinary users.
-- No paid AI provider is added.
-- No shared Omegalli/CLINICAL Edge Function is repurposed.
-- AppDeploy, `main`, KHAMINDRYA and unrelated shared systems remain untouched.
-- Knife, heat, oven, hot-oil and similar risky recipe steps retain adult-supervision warnings.
-- No E2E success claim is allowed unless the exact culinary acceptance chain is executed.
+- No paid AI provider or shared Omegalli/CLINICAL Edge Function.
+- AppDeploy source, `main`, KHAMINDRYA and unrelated systems remain untouched.
+- Existing adult-supervision warnings for knife/heat/oven/hot-oil risks remain mandatory.
+- No E2E claim unless the exact culinary acceptance chain is executed.
 
 ## File Structure
 
-- Create `dgusteaux-db/migrations/20260901_001_global_ingredient_schema.sql` — normalized schema, constraints, RLS, audit primitives.
-- Create `dgusteaux-db/migrations/20260901_002_global_ingredient_rpcs.sql` — authenticated read/analyze RPC contracts and permissions.
-- Create `dgusteaux-db/migrations/20260901_003_global_ingredient_seed_es.sql` — deterministic insert/upsert generated from reviewed ES-1 source data.
-- Create `dgusteaux-data/es-foundation-v1.json` — canonical ES-1 ingredient records only; no runtime secrets.
-- Create `dgusteaux-data/es-foundation-v1.sources.json` — source registry and review metadata.
-- Create `dgusteaux-client/ingredient-intelligence.js` — browser RPC adapter and response-shape guards.
-- Create `dgusteaux-client/ingredient-intelligence.test.mjs` — adapter tests.
-- Create `dgusteaux-client/ingredient-cache.js` — bounded IndexedDB/local cache abstraction with source/confidence preservation.
-- Create `dgusteaux-client/ingredient-cache.test.mjs` — cache tests.
-- Create `dgusteaux-client/ingredient-ui.js` — search/profile/substitution rendering helpers and interaction state.
-- Create `dgusteaux-client/ingredient-ui.test.mjs` — rendering/state tests.
-- Modify `dgusteaux-client/melo-intelligence.js` — optional ingredient-intelligence enrichment before server generation/adaptation without breaking local fallback.
-- Modify `dgusteaux-client/melo-intelligence.test.mjs` — regression + enrichment tests.
-- Create/update isolated static payload under `khamindrya-ionos/payload/ingredient-v1.txt`; update `khamindrya-ionos/index.html` only after payload integrity passes.
+- Create `dgusteaux-db/migrations/20260901_001_global_ingredient_schema.sql` — schema, constraints, RLS, audit.
+- Create `dgusteaux-db/migrations/20260901_002_global_ingredient_rpcs.sql` — search/profile/seasonality/substitution/analyze RPCs and grants.
+- Create `dgusteaux-db/migrations/20260901_003_global_ingredient_seed_es.sql` — idempotent reviewed ES-1 seed.
+- Create `dgusteaux-db/migrations/20260901_004_global_ingredient_safety_bridge.sql` — versioned replacement of the existing Safety Gate with canonical ingredient evidence added, preserving all current checks.
+- Create `dgusteaux-data/es-foundation-v1.json` — canonical ingredient data.
+- Create `dgusteaux-data/es-foundation-v1.sources.json` — source registry/review metadata.
+- Create `dgusteaux-data/es-foundation-v1.test.mjs` — deterministic dataset validation.
+- Create `dgusteaux-client/ingredient-intelligence.js` and `.test.mjs` — RPC adapter.
+- Create `dgusteaux-client/ingredient-cache.js` and `.test.mjs` — bounded cache.
+- Create `dgusteaux-client/ingredient-ui.js` and `.test.mjs` — UI view models/render helpers.
+- Modify `dgusteaux-client/melo-intelligence.js` and `.test.mjs` — optional enrichment without breaking existing fallback.
+- Create `khamindrya-ionos/payload/ingredient-v1.txt`; modify `khamindrya-ionos/index.html` only after payload integrity passes.
 
 ---
 
-### Task 1: Normalized Ingredient Schema and Data-Quality Constraints
+### Task 1: Normalized Ingredient Schema and Quality Constraints
 
 **Files:**
 - Create: `dgusteaux-db/migrations/20260901_001_global_ingredient_schema.sql`
 
 **Interfaces:**
-- Consumes: existing `dgusteaux` schema.
 - Produces: `ingredients`, `ingredient_aliases`, `ingredient_sensory`, `ingredient_functions`, `ingredient_allergens`, `ingredient_nutrition`, `ingredient_seasonality`, `ingredient_substitutions`, `ingredient_compatibility`, `ingredient_sources`, `ingredient_change_log`.
 
-- [ ] **Step 1: Write RED SQL assertions for missing tables and required constraints**
+- [ ] **Step 1: RED — prove schema is absent**
 
 ```sql
-select to_regclass('dgusteaux.ingredients') is not null as ingredients_exists;
-select to_regclass('dgusteaux.ingredient_sources') is not null as sources_exists;
-select to_regclass('dgusteaux.ingredient_substitutions') is not null as substitutions_exists;
+select to_regclass('dgusteaux.ingredients') is not null as ingredients_exists,
+       to_regclass('dgusteaux.ingredient_sources') is not null as sources_exists,
+       to_regclass('dgusteaux.ingredient_substitutions') is not null as substitutions_exists;
 ```
+Expected: all `false`.
 
-Expected before migration: all `false`.
+- [ ] **Step 2: Implement canonical tables and checks**
 
-- [ ] **Step 2: Apply the schema migration with explicit domains/checks**
-
-The migration must include:
+Core identity shape:
 
 ```sql
-create table dgusteaux.ingredients (
+create table dgusteaux.ingredients(
   id uuid primary key default gen_random_uuid(),
   canonical_name text not null,
   scientific_name text,
@@ -76,29 +71,22 @@ create table dgusteaux.ingredients (
   default_form text,
   origin_region text,
   active boolean not null default true,
-  revision bigint not null default 1 check (revision > 0),
+  revision bigint not null default 1 check(revision>0),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (lower(canonical_name), coalesce(default_form,''))
+  unique(lower(canonical_name),coalesce(default_form,''))
 );
 ```
 
-Use CHECK constraints for: sensory scores `0..5`; confidence in `VERIFIED/HIGH/MEDIUM/LOW/UNVERIFIED`; substitution/compatibility scores `0..100`; season month `1..12`; non-negative nutrition; valid allergen relation `CONTAINS/MAY_CONTAIN/CROSS_CONTACT_RISK/UNKNOWN`; `original_ingredient_id <> substitute_ingredient_id`; canonical compatibility pair ordering `ingredient_a_id < ingredient_b_id`.
+Required checks in the same migration: sensory `0..5`; confidence enum `VERIFIED/HIGH/MEDIUM/LOW/UNVERIFIED`; relationship scores `0..100`; season month `1..12`; nutrition value `>=0`; allergen relation enum; `original_ingredient_id<>substitute_ingredient_id`; canonical compatibility ordering `ingredient_a_id<ingredient_b_id`.
 
-`ingredient_change_log` is append-only: revoke client UPDATE/DELETE and store `entity_type`, `entity_id`, `previous_value jsonb`, `new_value jsonb`, `source_id`, `revision`, `changed_at`.
+- [ ] **Step 3: Add append-only audit and RLS**
 
-- [ ] **Step 3: Enable RLS and deny direct ordinary-client catalogue writes**
+`ingredient_change_log` stores `entity_type`, `entity_id`, `previous_value`, `new_value`, `source_id`, `revision`, `changed_at`. Enable RLS on all new catalogue tables. Revoke INSERT/UPDATE/DELETE from `anon` and `authenticated` only on the new tables; do not alter grants for pre-existing D’GUSTEAUX tables.
 
-```sql
-alter table dgusteaux.ingredients enable row level security;
-revoke insert, update, delete on all tables in schema dgusteaux from authenticated, anon;
-```
+- [ ] **Step 4: GREEN — transactional constraint suite**
 
-Do not disturb existing grants needed by pre-existing D’GUSTEAUX tables; scope revokes to the new ingredient tables in the actual migration.
-
-- [ ] **Step 4: Run GREEN constraint tests inside a transaction**
-
-Test that negative nutrition, month 13, self-substitution, score 101 and reversed duplicate compatibility fail; valid rows succeed and are rolled back.
+Inside `begin; ... rollback;`, assert valid rows insert and each invalid case fails independently: negative nutrient, month 13, score 101, self-substitution, reversed compatibility pair.
 
 - [ ] **Step 5: Commit**
 
@@ -109,200 +97,182 @@ git commit -m "feat: add ingredient intelligence schema"
 
 ---
 
-### Task 2: Authenticated Search and Ingredient Profile RPCs
+### Task 2: Authenticated Ingredient RPC Boundary
 
 **Files:**
 - Create: `dgusteaux-db/migrations/20260901_002_global_ingredient_rpcs.sql`
 
 **Interfaces:**
-- Consumes: Task 1 tables.
 - Produces:
-  - `public.dgusteaux_search_ingredients(p_query text, p_context jsonb default '{}') returns jsonb`
-  - `public.dgusteaux_get_ingredient(p_ingredient_id uuid, p_context jsonb default '{}') returns jsonb`
-  - `public.dgusteaux_get_seasonal_ingredients(p_context jsonb default '{}') returns jsonb`
+  - `dgusteaux_search_ingredients(text,jsonb)`
+  - `dgusteaux_get_ingredient(uuid,jsonb)`
+  - `dgusteaux_get_seasonal_ingredients(jsonb)`
+  - `dgusteaux_suggest_substitutes(uuid,jsonb)`
+  - `dgusteaux_analyze_ingredients(jsonb,jsonb)`
 
-- [ ] **Step 1: RED permission and existence assertions**
+- [ ] **Step 1: RED — functions absent and anon unusable**
 
 ```sql
 select to_regprocedure('public.dgusteaux_search_ingredients(text,jsonb)') is not null;
-select has_function_privilege('anon','public.dgusteaux_search_ingredients(text,jsonb)','EXECUTE');
 ```
-
-Expected: function absent; anonymous execution not available.
+Expected: `false`.
 
 - [ ] **Step 2: Implement normalized search**
 
-Requirements:
-- require `auth.uid()`;
-- trim and cap query to 120 chars;
-- accent-fold with `translate(lower(...),'áéíóúüñ','aeiouun')` consistently for canonical names and aliases;
-- return max 20 records;
-- return match source (`canonical` or `alias`), language/territory, category and confidence;
-- no hidden catalogue write.
+Require `auth.uid()`. Query max 120 chars; return max 20. Normalize with the same accent fold everywhere:
 
-- [ ] **Step 3: Implement complete profile RPC**
-
-Return a JSON object with keys exactly:
-
-```json
-{
-  "ok": true,
-  "ingredient": {},
-  "aliases": [],
-  "sensory": {},
-  "functions": [],
-  "nutrition": [],
-  "allergens": [],
-  "seasonality": [],
-  "compatibility": [],
-  "sources": [],
-  "warnings": []
-}
+```sql
+translate(lower(trim(v)),'áéíóúüñ','aeiouun')
 ```
 
-Do not promote `LOW/UNVERIFIED` nutrition or allergen rows to verified labels; include their confidence explicitly.
+Return `id`, `canonicalName`, `category`, `matchedBy`, `matchedAlias`, `language`, `country`, `subdivision`, `confidence`.
 
-- [ ] **Step 4: Implement territory-aware seasonality**
+- [ ] **Step 3: Implement profile and seasonality**
 
-Context accepts `country`, optional `subdivision`, and `month`. Prefer exact subdivision, then country-level fallback. Return `region_not_covered` when no source-backed seasonal record exists.
+`dgusteaux_get_ingredient` returns exactly:
 
-- [ ] **Step 5: Apply least-privilege grants and run GREEN tests**
+```json
+{"ok":true,"ingredient":{},"aliases":[],"sensory":{},"functions":[],"nutrition":[],"allergens":[],"seasonality":[],"compatibility":[],"sources":[],"warnings":[]}
+```
+
+Seasonality context uses `country`, optional `subdivision`, `month`; exact subdivision wins, then country fallback. No record returns `region_not_covered`.
+
+- [ ] **Step 4: Implement safety-first substitute ranking**
+
+Order is fixed: allergy/restriction eligibility → evidence threshold → conflict rejection → ranking. Candidate safety status can be `safe`, `unsafe`, or `insufficient_evidence`. Only `VERIFIED/HIGH` relevant evidence can produce `safe` for a declared condition.
+
+- [ ] **Step 5: Implement ingredient analysis**
+
+Return:
+
+```json
+{"ok":true,"resolved":[],"unresolved":[],"safetyFindings":[],"functions":[],"pantrySummary":{"atHome":0,"substitutable":0,"missing":0},"warnings":[]}
+```
+
+Ambiguous aliases return `ambiguous_alias`; missing safety evidence returns `insufficient_safety_evidence`.
+
+- [ ] **Step 6: Apply least privilege and GREEN permissions**
+
+For every new function:
 
 ```sql
 revoke all on function public.dgusteaux_search_ingredients(text,jsonb) from public, anon;
 grant execute on function public.dgusteaux_search_ingredients(text,jsonb) to authenticated, service_role;
 ```
 
-Repeat for all Task 2 RPCs. Verify `authenticated=true`, `anon=false`.
+Repeat with exact signatures. Verify `has_function_privilege('authenticated',...,'EXECUTE')=true` and `anon=false`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add dgusteaux-db/migrations/20260901_002_global_ingredient_rpcs.sql
-git commit -m "feat: add ingredient search and profile RPCs"
+git commit -m "feat: add ingredient intelligence RPCs"
 ```
 
 ---
 
-### Task 3: Verified ES-1 Foundation Dataset
+### Task 3: Reviewed ES-1 Foundation Dataset
 
 **Files:**
 - Create: `dgusteaux-data/es-foundation-v1.json`
 - Create: `dgusteaux-data/es-foundation-v1.sources.json`
+- Create: `dgusteaux-data/es-foundation-v1.test.mjs`
 - Create: `dgusteaux-db/migrations/20260901_003_global_ingredient_seed_es.sql`
 
 **Interfaces:**
-- Consumes: Task 1 schema.
-- Produces: a traceable initial Spain dataset used by Task 2/4 tests and UI.
+- Produces a small, traceable acceptance dataset used by all later tests.
 
-- [ ] **Step 1: Define a small acceptance seed set before scaling**
+- [ ] **Step 1: RED dataset validator**
 
-Use a deliberately bounded first cohort that exercises the model: `tomate`, `cebolla`, `ajo`, `arroz`, `pollo`, `limón`, `garbanzo`, `leche`, `huevo`, `cacahuete`, `trigo`, `almendra`, `aceite de oliva`, `pimiento`, `manzana`, `naranja`.
+Create `es-foundation-v1.test.mjs` with assertions that fail while files are absent, then enforce:
 
-- [ ] **Step 2: Record provenance using only reviewed sources**
-
-Use source records for:
-- AESAN/BEDCA food-composition data, with original-source attribution preserved.
-- AESAN allergen information aligned to Regulation (EU) 1169/2011 Annex II.
-- MAPA Spain seasonal fruit/vegetable calendars/guidance for seasonality.
-
-Every data row contains `sourceKey`, `confidence`, `reviewedAt`, and territory. Do not insert a nutrient/allergen/seasonality claim when the source does not substantiate it.
-
-- [ ] **Step 3: RED dataset validation script/check**
-
-Validate before SQL generation:
-- all canonical IDs/names unique;
-- every scientific/safety/nutrition record references a sourceKey;
-- confidence enum valid;
-- no allergen safety inference from missing data;
-- season months are 1..12.
-
-Use a Node test file if needed during implementation; do not hand-edit generated SQL without rerunning validation.
-
-- [ ] **Step 4: Generate deterministic idempotent seed SQL**
-
-Use stable canonical keys and `insert ... on conflict ... do update` only for explicitly curated catalogue rows. Preserve source/review timestamps from the data manifest.
-
-- [ ] **Step 5: GREEN data tests**
-
-Verify search finds `garbanzo`; milk has explicit `CONTAINS` evidence for milk allergen; peanut has explicit peanut evidence; tomato has at least one source-backed Spain seasonality record; all returned claims include source/confidence.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add dgusteaux-data dgusteaux-db/migrations/20260901_003_global_ingredient_seed_es.sql
-git commit -m "feat: seed verified Spain ingredient foundation"
-```
-
----
-
-### Task 4: Safety-Aware Substitution and Recipe Ingredient Analysis
-
-**Files:**
-- Modify: `dgusteaux-db/migrations/20260901_002_global_ingredient_rpcs.sql`
-
-**Interfaces:**
-- Produces:
-  - `public.dgusteaux_suggest_substitutes(p_ingredient_id uuid, p_context jsonb default '{}') returns jsonb`
-  - `public.dgusteaux_analyze_ingredients(p_ingredients jsonb, p_context jsonb default '{}') returns jsonb`
-- Reuses: `public.dgusteaux_validate_recipe(jsonb,jsonb)` as final recipe gate.
-
-- [ ] **Step 1: RED safety case**
-
-Create a test context declaring a peanut allergy and assert that any candidate with missing/`MEDIUM` peanut-safety evidence is not returned as `safe=true`.
-
-- [ ] **Step 2: Implement substitution eligibility before ranking**
-
-Eligibility order is fixed:
-1. resolve declared allergies/restrictions;
-2. require `VERIFIED` or `HIGH` evidence for the relevant safety dimension;
-3. reject conflicting candidates;
-4. only then rank by function/flavor/texture/nutrition/seasonality/availability.
-
-If evidence is insufficient return structured code `insufficient_safety_evidence`; if no eligible candidate remains return `no_safe_substitute`.
-
-- [ ] **Step 3: Implement ingredient analysis**
-
-Input: array of recipe ingredient names/objects plus context. Output keys:
-
-```json
-{
-  "ok": true,
-  "resolved": [],
-  "unresolved": [],
-  "safetyFindings": [],
-  "functions": [],
-  "pantrySummary": {"atHome":0,"substitutable":0,"missing":0},
-  "warnings": []
+```js
+assert.equal(new Set(data.ingredients.map(x=>x.key)).size,data.ingredients.length);
+for(const row of data.claims){
+  assert.ok(sources[row.sourceKey]);
+  assert.ok(['VERIFIED','HIGH','MEDIUM','LOW','UNVERIFIED'].includes(row.confidence));
 }
 ```
 
-Ambiguous alias matches must be surfaced as `ambiguous_alias`, not silently selected.
+Also assert months `1..12`, numeric values non-negative, and every allergen/nutrition/seasonality claim has a source.
 
-- [ ] **Step 4: Extend the Safety Gate bridge conservatively**
+- [ ] **Step 2: Create bounded acceptance cohort**
 
-Before a recipe adaptation is accepted, use ingredient analysis to detect source-backed allergen conflicts and then call existing `dgusteaux_validate_recipe`. Do not remove existing textual allergen checks or adult-supervision tagging.
+Seed exactly these canonical records first: `tomate`, `cebolla`, `ajo`, `arroz`, `pollo`, `limón`, `garbanzo`, `leche`, `huevo`, `cacahuete`, `trigo`, `almendra`, `aceite de oliva`, `pimiento`, `manzana`, `naranja`.
 
-- [ ] **Step 5: GREEN tests**
+- [ ] **Step 3: Populate source registry conservatively**
 
-Required cases:
-- safe substitution with `HIGH/VERIFIED` evidence passes;
-- conflicting allergen candidate rejected;
-- missing allergen evidence returns `insufficient_safety_evidence`;
-- ambiguous alias is unresolved;
-- final adapted recipe still passes existing Safety Gate;
-- knife/heat supervision flags remain true.
+Use reviewed records from:
+- BEDCA/AESAN for Spanish composition data, preserving attribution and usage conditions;
+- AESAN material aligned with Regulation (EU) 1169/2011 Annex II for allergen classes;
+- MAPA seasonal fruit/vegetable guidance/calendars for Spain.
 
-- [ ] **Step 6: Commit**
+Do not create a claim the selected source does not substantiate. Store locator, organization, accessed/reviewed date, source class and confidence in `es-foundation-v1.sources.json`.
+
+- [ ] **Step 4: GREEN dataset validation**
 
 ```bash
-git add dgusteaux-db/migrations/20260901_002_global_ingredient_rpcs.sql
-git commit -m "feat: add safe ingredient substitution analysis"
+node --test dgusteaux-data/es-foundation-v1.test.mjs
+```
+Expected: zero failures.
+
+- [ ] **Step 5: Generate idempotent seed SQL**
+
+Use stable text keys from JSON to resolve UUIDs; use `insert ... on conflict ... do update` only for curated rows. Generated SQL must preserve source/review metadata and must not synthesize missing claims.
+
+- [ ] **Step 6: GREEN DB acceptance data**
+
+Verify: `garbanzo` searchable; milk has explicit milk allergen evidence; peanut has explicit peanut evidence; tomato has source-backed Spain seasonality; every returned scientific/safety claim carries source/confidence.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add dgusteaux-data dgusteaux-db/migrations/20260901_003_global_ingredient_seed_es.sql
+git commit -m "feat: seed reviewed Spain ingredient foundation"
 ```
 
 ---
 
-### Task 5: Browser Ingredient Intelligence Adapter and Offline Cache
+### Task 4: Versioned Ingredient-Aware Safety Gate Bridge
+
+**Files:**
+- Create: `dgusteaux-db/migrations/20260901_004_global_ingredient_safety_bridge.sql`
+
+**Interfaces:**
+- Consumes Task 2 `dgusteaux_analyze_ingredients`.
+- Replaces the body, not the signature, of existing `public.dgusteaux_validate_recipe(jsonb,jsonb)`.
+- Preserves every existing structural, poultry, dangerous-operation and adult-supervision rule.
+
+- [ ] **Step 1: RED — canonical allergen evidence not yet enforced**
+
+Using an authenticated synthetic user, create a recipe containing an alias/canonical ingredient whose allergen conflict is represented only in the new catalogue. Expect current validator to miss that catalogue-specific conflict; record this as RED evidence.
+
+- [ ] **Step 2: Implement the bridge without weakening existing checks**
+
+At the start of validation, call canonical ingredient analysis on recipe ingredients and merge only source-backed safety findings into the existing error set. Required behavior:
+
+```text
+conflict + VERIFIED/HIGH evidence -> reject
+missing relevant evidence -> warning/error code insufficient_safety_evidence when user declared that condition
+no declared condition -> do not invent an allergy
+```
+
+Then continue all pre-existing textual checks and supervision tagging unchanged.
+
+- [ ] **Step 3: GREEN safety regression matrix**
+
+Required cases: catalogue allergen conflict rejected; `MEDIUM`/missing safety evidence not marked safe; existing peanut text conflict still rejected; incomplete poultry still rejected; safe poultry accepted; knife flag true; heat flag true.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add dgusteaux-db/migrations/20260901_004_global_ingredient_safety_bridge.sql
+git commit -m "feat: bridge ingredient evidence into Safety Gate"
+```
+
+---
+
+### Task 5: Browser Adapter and Bounded Offline Cache
 
 **Files:**
 - Create: `dgusteaux-client/ingredient-intelligence.js`
@@ -311,24 +281,24 @@ git commit -m "feat: add safe ingredient substitution analysis"
 - Create: `dgusteaux-client/ingredient-cache.test.mjs`
 
 **Interfaces:**
-- Produces `searchIngredients`, `getIngredientProfile`, `suggestSubstitutes`, `analyzeIngredients`, `getSeasonalIngredients`.
-- Cache API: `getCachedIngredient(id)`, `putCachedIngredient(profile)`, `pruneIngredientCache(maxEntries=50)`.
+- Adapter exports `searchIngredients`, `getIngredientProfile`, `suggestSubstitutes`, `analyzeIngredients`, `getSeasonalIngredients`.
+- Cache exports `getCachedIngredient`, `putCachedIngredient`, `pruneIngredientCache`.
 
 - [ ] **Step 1: RED adapter tests**
 
-Test: authenticated RPC success; no session returns structured local-unavailable result; RPC error does not fabricate data; malformed response rejected.
+Test no module/function, then authenticated success, no-session result, RPC error, malformed response and structured uncertainty preservation.
 
-- [ ] **Step 2: Implement adapter shape guards**
+- [ ] **Step 2: Implement guarded adapter**
 
-Every method returns `{ok,data,warnings,reason}` and never converts an RPC uncertainty code into success.
+Each method returns `{ok,data,warnings,reason}`. No method turns `insufficient_safety_evidence`, `ambiguous_alias` or other uncertainty into success.
 
 - [ ] **Step 3: RED cache tests**
 
-Test that cached profiles preserve `sources`, `confidence`, `reviewedAt`; max 50 entries; oldest entries evicted; expired/stale data is labeled stale rather than silently current.
+Assert source/confidence/reviewedAt preservation, max 50 records, oldest eviction and stale labeling.
 
-- [ ] **Step 4: Implement bounded offline cache**
+- [ ] **Step 4: Implement cache**
 
-Use IndexedDB when available; provide an in-memory fallback for test/non-browser environments. Never cache an ingredient profile without its provenance/confidence metadata.
+Use IndexedDB in browser and in-memory adapter in test/non-browser context. Reject caching a profile that lacks provenance/confidence metadata.
 
 - [ ] **Step 5: GREEN**
 
@@ -338,8 +308,7 @@ node --test dgusteaux-client/ingredient-cache.test.mjs
 node --check dgusteaux-client/ingredient-intelligence.js
 node --check dgusteaux-client/ingredient-cache.js
 ```
-
-Expected: zero failures and syntax exit 0.
+Expected: zero failures.
 
 - [ ] **Step 6: Commit**
 
@@ -350,7 +319,7 @@ git commit -m "feat: add ingredient intelligence browser client"
 
 ---
 
-### Task 6: Ingredient Search/Profile/Substitution UI and MELO Integration
+### Task 6: Ingredient UI and MELO Context Enrichment
 
 **Files:**
 - Create: `dgusteaux-client/ingredient-ui.js`
@@ -359,32 +328,32 @@ git commit -m "feat: add ingredient intelligence browser client"
 - Modify: `dgusteaux-client/melo-intelligence.test.mjs`
 
 **Interfaces:**
-- UI consumes Task 5 adapter only; no direct Supabase table access.
-- MELO enrichment consumes `analyzeIngredients` output and passes only structured context into the existing generator.
+- UI consumes Task 5 adapter only; never direct tables.
+- MELO accepts optional `ingredientIntelligence` dependency.
 
 - [ ] **Step 1: RED UI tests**
 
-Assert rendering contains: ingredient identity, confidence badge, provenance, seasonality, allergen block, substitution dimension scores and explicit uncertainty text.
+Require view models to expose identity, confidence badge, provenance, seasonality, allergen state, substitution dimension scores and explicit uncertainty.
 
-- [ ] **Step 2: Implement pure rendering/state helpers**
-
-Export pure functions such as:
+- [ ] **Step 2: Implement pure UI helpers**
 
 ```js
-export function confidenceLabel(level) {}
-export function buildIngredientViewModel(profile) {}
-export function buildSubstitutionViewModel(result) {}
+export function confidenceLabel(level){
+  return ({VERIFIED:'✓ VERIFICADO',HIGH:'ALTA CONFIANZA',MEDIUM:'CONFIANZA MEDIA',LOW:'DATO LIMITADO',UNVERIFIED:'DATO LIMITADO'})[level]||'DATO LIMITADO';
+}
+export function buildIngredientViewModel(profile){}
+export function buildSubstitutionViewModel(result){}
 ```
 
-Use established D’GUSTEAUX visual copy: `✓ VERIFICADO`, `ALTA CONFIANZA`, `CONFIANZA MEDIA`, `DATO LIMITADO`.
+The completed functions must never hide low/unverified safety confidence.
 
-- [ ] **Step 3: RED MELO enrichment regression**
+- [ ] **Step 3: RED MELO regression/enrichment**
 
-Existing generation tests must still pass when no ingredient adapter is supplied. Add a test where an adapter supplies resolved canonical context and another where analysis fails; failure must fall back to current behavior rather than block local generation.
+Existing five `melo-intelligence` tests remain required. Add: resolved ingredient context reaches server `p_context.ingredientIntelligence`; analysis failure preserves current generation/fallback behavior.
 
-- [ ] **Step 4: Implement optional enrichment in `generateWithMelo`**
+- [ ] **Step 4: Implement optional enrichment**
 
-Add an optional `ingredientIntelligence` dependency. If present and authenticated, analyze requested/pantry ingredients and add only safe structured results to `p_context.ingredientIntelligence`; otherwise preserve current generation behavior exactly.
+Before server generation, if `ingredientIntelligence?.analyzeIngredients` exists and returns `ok=true`, attach only the returned structured analysis to `p_context.ingredientIntelligence`. Otherwise send the original context unchanged. Do not block local generation.
 
 - [ ] **Step 5: GREEN**
 
@@ -404,56 +373,55 @@ git commit -m "feat: integrate ingredient intelligence with MELO UI"
 
 ---
 
-### Task 7: Static Build Integration, Exact Culinary E2E and Release Registration
+### Task 7: Static Integration, Exact Culinary E2E and Release Registry
 
 **Files:**
-- Create/update: `khamindrya-ionos/payload/ingredient-v1.txt`
-- Modify only after payload verification: `khamindrya-ionos/index.html`
-- Update after all gates pass: `dgusteaux.release_registry` through SQL, not a repo file.
+- Create: `khamindrya-ionos/payload/ingredient-v1.txt`
+- Modify: `khamindrya-ionos/index.html`
+- DB metadata: `dgusteaux.release_registry` after all gates pass.
 
 **Interfaces:**
-- Consumes all previous tasks.
-- Produces protected technical preview on `dgusteaux-fallback` only.
+- Produces the protected technical preview on `dgusteaux-fallback` only.
 
-- [ ] **Step 1: Integrate UI into the tested single-file D’GUSTEAUX build**
+- [ ] **Step 1: Integrate the UI into the verified single-file build**
 
-Add entry points from Search, Pantry, Recipe, Substitute and MELO Cockpit. Do not remove existing recipe generation, rating, save, sync or safety behavior.
+Add entry points from Search, Pantry, Recipe, Substitute and MELO Cockpit. Preserve recipe generation, ratings, save, sync, Cockpit and safety behavior.
 
-- [ ] **Step 2: Run browser/static regression checks before packaging**
+- [ ] **Step 2: RED/GREEN static UI assertions and JS syntax**
 
-Check exact required strings/actions exist and extract inline JavaScript for `node --check`. Exercise local mode with no network/auth and verify cached ingredient data retains confidence/source labels.
+Before integration, assertions for ingredient search/profile/substitution controls fail. After integration they pass. Extract inline JS and run `node --check` with exit 0.
 
-- [ ] **Step 3: Package atomically**
+- [ ] **Step 3: Package and prove byte integrity**
 
-Gzip the verified HTML, base64 encode it into `ingredient-v1.txt`, reconstruct it locally, and assert reconstructed SHA-256 equals the source HTML SHA-256 before changing the launcher.
+Gzip the final HTML, base64 into `ingredient-v1.txt`, reconstruct locally and verify:
 
-- [ ] **Step 4: Switch launcher only after payload integrity passes**
+```text
+sha256(reconstructed_html) == sha256(source_html)
+```
 
-Update `khamindrya-ionos/index.html` from the prior payload to `./payload/ingredient-v1.txt`. Preserve AppDeploy fallback link.
+Do not change the launcher until this passes.
 
-- [ ] **Step 5: Execute the exact culinary E2E acceptance chain**
+- [ ] **Step 4: Switch isolated launcher atomically**
 
-Using authenticated synthetic test state, execute:
+Update only `khamindrya-ionos/index.html` to fetch `./payload/ingredient-v1.txt`; preserve the AppDeploy fallback URL.
+
+- [ ] **Step 5: Execute exact authenticated culinary E2E**
+
+Run and record every stage:
 
 `search ingredient → ingredient profile → provenance → seasonality → allergen detection → safe substitute → substitution explanation → recipe adaptation → dgusteaux_validate_recipe success`
 
-Record each stage result. If any stage is skipped, do not claim E2E success.
+If any stage is absent/fails, E2E status is not passed.
 
-- [ ] **Step 6: Run continuity verification**
+- [ ] **Step 6: Full continuity gate**
 
-Verify:
-- all ingredient RPCs `authenticated=true`, `anon=false`;
-- existing `dgusteaux_generate_recipe`, `dgusteaux_apply_quick_adjustment`, `dgusteaux_validate_recipe`, save/sync/rating regressions remain green;
-- Vercel branch deployment is `READY` with no build errors;
-- AppDeploy remains `ready`; if `e2e_tests` is null, state that it is null rather than passed;
-- shared Omegalli/CLINICAL Edge Functions were not modified by this work;
-- `main` remains untouched.
+Verify all ingredient RPCs `authenticated=true`, `anon=false`; existing generator, quick-adjustment, Safety Gate, save/sync/rating regressions green; Vercel branch `READY` with no build errors; AppDeploy still `ready` and report `e2e_tests` truthfully; shared Omegalli/CLINICAL Edge Functions unchanged by this work; `main` untouched.
 
-- [ ] **Step 7: Update release registry only after all gates pass**
+- [ ] **Step 7: Register release only after all gates pass**
 
-Set D’GUSTEAUX Supabase source version to `rpc-v1-global-ingredient-intelligence` and Vercel fallback source version to the final isolated branch commit. Notes must include the final payload SHA and E2E result.
+Set Supabase source version to `rpc-v1-global-ingredient-intelligence`, Vercel fallback to final isolated commit, and include payload SHA plus exact E2E outcome in notes.
 
-- [ ] **Step 8: Commit final static integration**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add khamindrya-ionos/index.html khamindrya-ionos/payload/ingredient-v1.txt
@@ -462,14 +430,15 @@ git commit -m "feat: activate Global Ingredient Intelligence v1 preview"
 
 ## Final Verification Checklist
 
-- [ ] Schema constraints reject invalid scientific/safety data.
-- [ ] ES-1 seed data has traceable source/confidence metadata.
-- [ ] Search/profile/seasonality RPCs work and are auth-only.
-- [ ] Substitute ranking never precedes safety eligibility.
-- [ ] Missing safety evidence returns `insufficient_safety_evidence`.
+- [ ] Invalid nutrition, seasonality and relationship values are rejected by DB constraints.
+- [ ] ES-1 seed claims are source-backed and carry confidence.
+- [ ] Search/profile/seasonality/substitution/analyze RPCs are auth-only.
+- [ ] Safety eligibility always precedes substitute ranking.
+- [ ] Missing relevant safety evidence returns `insufficient_safety_evidence`.
+- [ ] Safety Gate preserves existing rules and adds canonical evidence checks.
 - [ ] MELO consumes intelligence without direct table coupling.
-- [ ] UI visibly preserves uncertainty/provenance.
-- [ ] Offline cache preserves source/confidence and bounded size.
-- [ ] Exact culinary E2E chain passes end-to-end.
+- [ ] UI preserves uncertainty and provenance.
+- [ ] Offline cache preserves source/confidence and is bounded to 50 profiles.
+- [ ] Exact culinary E2E chain passes before any E2E-success claim.
 - [ ] Existing MELO/Cockpit/Safety Gate regressions remain green.
-- [ ] No shared Edge Function, `main`, AppDeploy source, KHAMINDRYA or unrelated system is modified.
+- [ ] No shared Edge Function, AppDeploy source, `main`, KHAMINDRYA or unrelated system is modified.
