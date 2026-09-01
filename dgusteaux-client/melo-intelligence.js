@@ -17,7 +17,7 @@ function localResult(localGenerate,prompt,pantryItems,reason){
   return {mode:'local',label:LOCAL_LABEL,source:'local',recipe,warnings:[],explanation:[],reason};
 }
 
-export async function generateWithMelo({supabase,prompt='',pantryItems=[],localGenerate,context={},online=globalThis.navigator?.onLine??true}={}){
+export async function generateWithMelo({supabase,prompt='',pantryItems=[],localGenerate,context={},ingredientIntelligence=null,online=globalThis.navigator?.onLine??true}={}){
   if(typeof localGenerate!=='function') throw new TypeError('localGenerate_required');
   if(!online||!supabase?.auth?.getSession||!supabase?.rpc) return localResult(localGenerate,prompt,pantryItems,'offline_or_cloud_unavailable');
   try{
@@ -25,6 +25,13 @@ export async function generateWithMelo({supabase,prompt='',pantryItems=[],localG
     const session=sessionResult?.data?.session;
     if(!session?.user) return localResult(localGenerate,prompt,pantryItems,'authentication_required');
     const p_context={...context,prompt,pantry:pantryItems};
+    if(typeof ingredientIntelligence?.analyzeIngredients==='function'){
+      try{
+        const analysisIngredients=Array.isArray(context?.ingredients)?context.ingredients:pantryItems;
+        const analysis=await ingredientIntelligence.analyzeIngredients({supabase,ingredients:analysisIngredients,context});
+        if(analysis?.ok===true&&analysis.data&&typeof analysis.data==='object') p_context.ingredientIntelligence=analysis.data;
+      }catch{}
+    }
     const {data,error}=await supabase.rpc('dgusteaux_generate_recipe',{p_context});
     if(error||!data?.ok||!validRecipe(data.recipe)) return localResult(localGenerate,prompt,pantryItems,error?.message||'invalid_server_response');
     return {
