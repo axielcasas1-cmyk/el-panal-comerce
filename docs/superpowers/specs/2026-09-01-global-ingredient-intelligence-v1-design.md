@@ -7,13 +7,13 @@ Status: Design approved in chat; implementation not started
 
 ## 1. Objective
 
-Build a new D’GUSTEAUX subsystem that gives MELO structured, sourced, region-aware ingredient intelligence. Version 1 starts with Spain while using a global-ready model so later expansion to Europe and worldwide regions does not require an architectural rewrite.
+Build a D’GUSTEAUX subsystem that gives MELO structured, sourced and region-aware ingredient intelligence. Version 1 starts with Spain but uses a global-ready model so later expansion to Europe and worldwide regions does not require an architectural rewrite.
 
-The subsystem must support the complete functional chain:
+Required functional chain:
 
-`search ingredient → open ingredient profile → inspect provenance → inspect seasonality → detect allergen/restriction conflicts → obtain safe substitute → explain substitution → adapt recipe → re-run Safety Gate`
+`search ingredient → ingredient profile → provenance → seasonality → allergen/restriction detection → safe substitute → explanation → recipe adaptation → Safety Gate`
 
-This subsystem is not a decorative catalogue. It is an operational knowledge layer consumed by MELO, Pantry, Recipes, Substitution flows and the MELO Intelligence Cockpit.
+This is an operational knowledge layer consumed by MELO, Pantry, Recipes, substitution flows and the MELO Intelligence Cockpit, not a decorative catalogue.
 
 ## 2. Scope
 
@@ -28,10 +28,9 @@ This subsystem is not a decorative catalogue. It is an operational knowledge lay
 - Ingredient compatibility relationships.
 - Function-aware substitutions.
 - Data provenance, versioning and confidence.
-- Search and lookup RPCs.
-- Ingredient analysis RPCs consumed by MELO.
-- UI surfaces for search, ingredient profile, substitutions and confidence.
-- Local/offline cache for recently used ingredients and saved recipes.
+- Ingredient search, lookup, analysis, substitution and seasonality RPCs.
+- UI for search, ingredient profile, substitutions and confidence.
+- Bounded local/offline cache for recent ingredients and saved recipes.
 
 ### Explicitly excluded from v1
 - Live supermarket pricing.
@@ -46,19 +45,17 @@ This subsystem is not a decorative catalogue. It is an operational knowledge lay
 1. **Spain-first, global-ready.** Initial verified content focuses on ingredients available in Spain. Territory modelling uses standard country/subdivision identifiers so new regions can be added without schema changes.
 2. **No mega-table.** Identity, nutrition, allergens, seasonality, sensory properties, substitutions and provenance remain separate bounded domains.
 3. **Provenance required.** Safety-, allergen- and nutrition-relevant facts are never presented as verified without an attributable source.
-4. **Safety outranks optimization.** Allergies, dietary restrictions and existing D’GUSTEAUX Safety Gate rules always override preference, taste, cost and convenience.
+4. **Safety outranks optimization.** Allergies, dietary restrictions and existing D’GUSTEAUX Safety Gate rules override preference, taste, cost and convenience.
 5. **Unknown remains unknown.** Missing evidence is represented as `NULL` / `UNVERIFIED`; the system never invents data to fill gaps.
 6. **Consumers use RPC contracts.** MELO and the browser client do not depend directly on table layouts.
 7. **Isolation.** The subsystem lives in D’GUSTEAUX database objects and the `dgusteaux-fallback` branch. AppDeploy, `main`, KHAMINDRYA and unrelated shared systems are not modified by this work.
 
 ## 4. Data model
 
-The implementation should use normalized tables in the `dgusteaux` schema.
+Use normalized tables in the `dgusteaux` schema.
 
 ### 4.1 `ingredients`
-Canonical ingredient identity.
-
-Minimum fields:
+Canonical identity with at least:
 - `id uuid primary key`
 - `canonical_name text`
 - `scientific_name text null`
@@ -69,93 +66,40 @@ Minimum fields:
 - `active boolean`
 - timestamps and revision metadata
 
-Canonical identity must not depend on language or retailer naming.
+Canonical identity does not depend on language or retailer naming.
 
 ### 4.2 `ingredient_aliases`
-- ingredient id
-- alias text
-- language code
-- country code nullable
-- subdivision code nullable
-- alias type: common / regional / scientific / commercial
-- normalized search form
-
-Duplicate normalized aliases inside the same language/territory context are prohibited.
+Fields include ingredient id, alias, language code, optional country/subdivision, alias type (`common`, `regional`, `scientific`, `commercial`) and normalized search form. Duplicate normalized aliases inside the same language/territory context are prohibited.
 
 ### 4.3 `ingredient_sensory`
-Numeric profile for relevant dimensions, using a consistent bounded scale.
+Use a consistent bounded scale for:
+`sweet, salty, acidic, bitter, umami, fatty, spicy, astringent, aromatic_intensity, juicy, crunchy, creamy, persistence`.
 
-Supported v1 dimensions:
-- sweet
-- salty
-- acidic
-- bitter
-- umami
-- fatty
-- spicy
-- astringent
-- aromatic_intensity
-- juicy
-- crunchy
-- creamy
-- persistence
-
-Not every ingredient requires every dimension. Missing values remain null.
+Missing dimensions remain null.
 
 ### 4.4 `ingredient_functions`
-Contextual culinary roles such as:
-- structure
-- binder
-- thickener
-- fat
-- moisture
-- acidity
-- sweetness
-- umami
-- aroma
-- leavening
-- emulsification
-- browning
-- garnish
+Contextual roles include:
+`structure, binder, thickener, fat, moisture, acidity, sweetness, umami, aroma, leavening, emulsification, browning, garnish`.
 
-A single ingredient can have multiple functions with context and technique qualifiers.
+One ingredient may have multiple roles with technique/context qualifiers.
 
 ### 4.5 `ingredient_allergens`
-Each relation is explicitly typed:
+Every relation is explicitly typed:
 - `CONTAINS`
 - `MAY_CONTAIN`
 - `CROSS_CONTACT_RISK`
 - `UNKNOWN`
 
-The model must not collapse possible traces into confirmed ingredient content.
+Possible traces must never be collapsed into confirmed content.
 
 ### 4.6 `ingredient_nutrition`
-Normalized values per 100 g or 100 ml.
-
-Each measurement stores:
-- nutrient key
-- numeric value
-- unit
-- basis (`100g` or `100ml`)
-- source reference
-- source territory when relevant
-- validity/review metadata
-
-Negative nutrition values are invalid.
+Measurements are normalized per `100g` or `100ml` and store nutrient key, value, unit, basis, source reference, source territory when relevant, validity and review metadata. Negative values are invalid.
 
 ### 4.7 `ingredient_seasonality`
-Territory-aware season information:
-- country code
-- subdivision code nullable
-- month 1–12
-- status: peak / in_season / shoulder / limited / unavailable / unknown
-- production or market context when supported
-- source reference
+Store country, optional subdivision, month 1–12, status (`peak`, `in_season`, `shoulder`, `limited`, `unavailable`, `unknown`), production/market context when supported, source and review metadata.
 
 ### 4.8 `ingredient_substitutions`
-Directed relation from original ingredient to substitute.
-
-Independent 0–100 scores:
+Directed original→substitute relation with independent 0–100 scores for:
 - culinary_function
 - flavor
 - texture
@@ -164,49 +108,24 @@ Independent 0–100 scores:
 - availability
 - restriction_compatibility
 
-Also store:
-- technique context
-- dish context
-- explanation
-- caveats
-- source/confidence
-
-Self-substitution is prohibited.
+Also store technique context, dish context, explanation, caveats, source and confidence. Self-substitution is prohibited.
 
 ### 4.9 `ingredient_compatibility`
-Canonical pair relation with a 0–100 score plus reason/context:
-- aromatic affinity
-- acid/fat balance
-- umami reinforcement
-- sweet/salty contrast
-- texture contrast
-- traditional pairing
-- technique-specific compatibility
-
-A↔B duplicate pairs are prohibited.
+Canonical pair relation with 0–100 score, reason and context such as aromatic affinity, acid/fat balance, umami reinforcement, sweet/salty contrast, texture contrast, traditional pairing or technique-specific compatibility. Duplicate A↔B pairs are prohibited.
 
 ### 4.10 `ingredient_sources`
-Source registry containing:
-- source id
-- source title
-- source organization
-- URL or source locator
-- source class
-- country/region
-- accessed/reviewed dates
-- confidence level
-- active/current flag
+Source registry stores source id, title, organization, locator/URL, source class, territory, accessed/reviewed dates, confidence and active/current state.
 
 Preferred source hierarchy for Spain:
 1. public institutions and official databases;
 2. recognized scientific/technical sources;
 3. verified producer, DOP/IGP and sector sources;
-4. commercial catalogues only for availability-type evidence, never as primary authority for safety or nutrition.
+4. commercial catalogues only for availability evidence, never as primary authority for safety or nutrition.
 
 ### 4.11 Audit/version history
 Safety-, allergen-, nutrition-, seasonality- and substitution-relevant changes require append-only audit records identifying previous value, new value, source, revision and timestamp.
 
-## 5. Confidence model
+## 5. Confidence and safety evidence model
 
 Allowed confidence values:
 - `VERIFIED`
@@ -217,67 +136,62 @@ Allowed confidence values:
 
 Rules:
 - `LOW` and `UNVERIFIED` are never rendered as established fact.
-- Allergen and safety decisions require stricter evidence than ordinary culinary compatibility.
-- If no sufficiently verified safe substitute exists, MELO must return that no verified substitution is available.
+- Ordinary culinary compatibility may expose `MEDIUM` data with an explicit confidence label.
+- A substitution may be presented as **verified safe for a declared allergy/restriction only when the evidence covering that specific allergen/restriction for the proposed substitute is `VERIFIED` or `HIGH`**.
+- Absence of allergen data is not evidence of safety.
+- If relevant evidence is `MEDIUM`, `LOW`, `UNVERIFIED` or missing, MELO must not label the substitute safe and must return a structured `insufficient_safety_evidence` outcome.
+- Safety and allergen evidence outrank substitution score, palate, cost, seasonality and convenience.
 
-## 6. RPC boundary
+## 6. RPC boundary and permissions
 
-Planned public D’GUSTEAUX contracts:
+Planned D’GUSTEAUX contracts:
 
 ### `dgusteaux_search_ingredients(p_query, p_context)`
-Returns canonical matches with alias match information, category, territory relevance and confidence.
+Canonical matches with alias match data, category, territorial relevance and confidence.
 
 ### `dgusteaux_get_ingredient(p_ingredient_id, p_context)`
-Returns the complete user-facing profile: identity, sensory information, uses, nutrition, allergens, seasonality, compatibility, provenance and confidence.
+User-facing profile containing identity, sensory data, uses, nutrition, allergens, seasonality, compatibility, provenance and confidence.
 
 ### `dgusteaux_suggest_substitutes(p_ingredient_id, p_context)`
-Returns ranked substitutions after applying allergy/restriction filters. Must expose independent score dimensions and explanation.
+Ranked substitutes after allergy/restriction safety filtering; exposes independent score dimensions, confidence, explanation and caveats.
 
 ### `dgusteaux_analyze_ingredients(p_ingredients, p_context)`
-Normalizes recipe ingredients, maps culinary functions, highlights unresolved items and returns safety/restriction findings.
+Normalizes recipe ingredients, maps functions, highlights unresolved items and returns safety/restriction findings.
 
 ### `dgusteaux_get_seasonal_ingredients(p_context)`
-Returns seasonally relevant ingredients for the requested territory and month.
+Seasonally relevant ingredients for requested territory/month.
 
-These contracts should use SECURITY INVOKER and least privilege. Authentication requirements should follow existing D’GUSTEAUX patterns; no public write access is introduced.
+Permission contract for v1:
+- all ingredient-intelligence RPCs use `SECURITY INVOKER`;
+- `authenticated=true` and `service_role=true` as appropriate;
+- `anon=false` and `public=false` for execution;
+- ordinary authenticated users receive read/analyze behavior only;
+- catalogue curation writes are never exposed through these client RPCs;
+- RLS and explicit EXECUTE grants are tested.
 
 ## 7. MELO decision flow
 
-For recipe generation or correction:
-
+For generation or correction:
 1. Normalize ingredient names to canonical ids.
-2. Resolve aliases/language/region.
-3. Apply Safety Gate and explicit allergies/restrictions before optimization.
-4. Build a sensory and culinary-function profile.
+2. Resolve aliases, language and region.
+3. Apply Safety Gate plus explicit allergies/restrictions before optimization.
+4. Build sensory and culinary-function profiles.
 5. Prefer pantry ingredients and regionally appropriate seasonal items.
-6. Rank substitutions by function, flavor, texture, safety, nutrition, seasonality and availability.
-7. Explain every meaningful substitution or correction.
-8. Rebuild the candidate recipe only with allowed changes.
+6. Rank only safety-eligible substitutes by function, flavor, texture, nutrition, seasonality and availability.
+7. Explain every meaningful substitution/correction.
+8. Rebuild the candidate only with permitted changes.
 9. Re-run `dgusteaux_validate_recipe` before returning the result.
 
-MELO must never silently replace an ingredient when the replacement could change allergen or restriction status.
-
-Preference adaptation may alter technique or select among already-safe candidates, but may not override safety constraints.
+MELO never silently replaces an ingredient when allergen/restriction status could change. Preference adaptation can alter technique or select among already-safe candidates but cannot override safety.
 
 ## 8. Contextual compatibility
 
-Compatibility is contextual, not universally binary. The same ingredient pair may score differently depending on technique or culinary function. Substitution evaluation must therefore support optional technique/dish context instead of relying on one global score.
+Compatibility is contextual, not universally binary. Pair scores may vary by technique or culinary function. Substitution evaluation supports optional technique/dish context rather than relying on one global score.
 
 ## 9. User interface
 
 ### Global ingredient search
-Available from Search, Pantry, Recipe, Substitute and MELO Intelligence Cockpit.
-
-Search supports:
-- aliases and regional names
-- multilingual names
-- reasonable spelling variation
-- category filters
-- season filters
-- dietary restrictions
-- allergens
-- sensory profile
-- regional relevance
+Available from Search, Pantry, Recipe, Substitute and MELO Intelligence Cockpit. Supports aliases/regional names, multilingual names, reasonable spelling variation, category, season, dietary restrictions, allergens, sensory profile and regional relevance.
 
 ### Ingredient profile
 Sections:
@@ -291,31 +205,31 @@ Sections:
 - Seasonality
 - Provenance/confidence
 
-Substitution UI exposes multidimensional scoring rather than only a single opaque number.
+Substitution UI exposes multidimensional scoring instead of only one opaque number.
 
 ### Pantry integration
 Recipe analysis can summarize states such as:
-`5 EN CASA · 2 SUSTITUIBLES · 1 FALTA`
+`5 EN CASA · 2 SUSTITUIBLES · 1 FALTA`.
 
-If a safe substitute is already in the pantry, MELO may offer a validated adapted recipe.
+If a safety-eligible substitute is already in the pantry, MELO may offer a newly validated adapted recipe.
 
 ### Confidence UI
-Human-readable labels:
+Human labels:
 - ✓ VERIFICADO
 - ALTA CONFIANZA
 - CONFIANZA MEDIA
 - DATO LIMITADO
 
-Unverified safety information must remain visibly unverified.
+Unverified safety information remains visibly unverified.
 
 ### Visual language
-Reuse the established D’GUSTEAUX/MELO dark, translucent, premium visual system. Scientific information should be legible and hierarchical, not visually overloaded.
+Reuse the established D’GUSTEAUX/MELO dark, translucent premium system. Scientific information is hierarchical and legible rather than visually overloaded.
 
 ## 10. Localization and expansion
 
-Territory hierarchy supports global country and subdivision codes.
+Territory hierarchy uses global country and subdivision codes.
 
-Initial rollout:
+Rollout sequence:
 - ES-1: foundational ingredients available in Spain
 - ES-2: regional Spanish products, DOP/IGP and territorial seasonality
 - EU-1: Portugal, France, Italy
@@ -326,37 +240,32 @@ Expansion adds content, not a new architecture.
 
 ## 11. Offline and performance
 
-The browser must not download the global catalogue.
+The browser never downloads the global catalogue. Use indexed queries and bounded RPC responses for search, selected profiles, requested relationships and regional seasonality.
 
-Use indexed queries and bounded RPC responses for:
-- search results
-- selected ingredient profile
-- requested relationships
-- regional seasonality
+Offline mode stores only a bounded cache of recently used ingredients and ingredient data required by saved recipes. Cached data preserves source, confidence and review metadata so stale/uncertain data cannot masquerade as current verified data.
 
-Offline mode stores only a bounded cache of recently used ingredients and ingredient data required by saved recipes. Cache content must preserve source/confidence metadata.
+## 12. Structured uncertainty and errors
 
-## 12. Error handling
+Explicit outcomes include:
+- `ingredient_not_resolved`
+- `ambiguous_alias`
+- `nutrition_not_verified`
+- `allergen_evidence_missing`
+- `insufficient_safety_evidence`
+- `no_safe_substitute`
+- `region_not_covered`
+- `source_stale_or_superseded`
 
-Expected explicit outcomes include:
-- ingredient not resolved
-- ambiguous alias
-- missing verified nutrition
-- missing verified allergen information
-- no safe substitute
-- region not yet covered
-- source data stale or superseded
-
-Errors and uncertainty are returned as structured data; the UI must not convert uncertainty into certainty.
+The UI must not convert uncertainty into certainty.
 
 ## 13. Security and data quality
 
-- No unsafe culinary practice may be introduced by substitution or adaptation.
+- No unsafe culinary practice may be introduced by substitution/adaptation.
 - Existing adult-supervision warnings for knife, heat, oven, hot oil or similar risk remain in force.
 - No new shared Edge Function is required for v1.
-- Write operations for catalogue curation are not exposed to ordinary authenticated users.
-- Read RPCs expose only the fields needed by the client.
-- RLS, explicit grants and function execution permissions must be tested.
+- Catalogue curation writes are not exposed to ordinary authenticated users.
+- Read RPCs expose only fields needed by the client.
+- RLS, grants and execution permissions are tested.
 
 ## 14. Testing strategy
 
@@ -366,31 +275,31 @@ Required layers:
 - schema constraint tests
 - RPC permission tests
 - canonical/alias search tests
-- source/confidence tests
-- allergen conflict tests
-- substitution ranking tests
+- provenance/confidence tests
+- allergen evidence tests
+- substitution ranking and abstention tests
 - seasonality territory tests
 - MELO integration tests
 - offline cache tests
 - browser rendering tests
-- regression tests ensuring existing recipe generation and Safety Gate remain intact
+- regression tests for recipe generation and Safety Gate
 
-The acceptance E2E culinary scenario is:
+Acceptance E2E culinary scenario:
 
 `search ingredient → ingredient profile → provenance → seasonality → allergen detection → safe substitute → substitution explanation → recipe adaptation → Safety Gate success`
 
-No claim of E2E success is allowed unless that exact scenario has been executed and passed.
+No E2E success claim is allowed unless that exact scenario has been executed and passed.
 
 ## 15. Definition of Done for v1
 
 v1 is complete only when:
-- the normalized schema exists and constraints are active;
+- normalized schema and constraints are active;
 - initial Spain dataset is loaded from traceable sources;
-- all planned read/analyze RPCs are implemented with tested permissions;
-- MELO consumes ingredient intelligence without direct table coupling;
+- all planned RPCs are implemented with tested permissions;
+- MELO consumes intelligence without direct table coupling;
 - UI search/profile/substitution flows are functional;
 - uncertainty and provenance are visible;
-- safe substitution cannot bypass allergies/restrictions;
+- substitutions cannot bypass allergies/restrictions or insufficient evidence;
 - the E2E culinary acceptance scenario passes;
 - existing D’GUSTEAUX recipe generation, Cockpit and Safety Gate regressions remain green;
 - AppDeploy, `main`, KHAMINDRYA and unrelated shared systems remain untouched unless separately authorized.
