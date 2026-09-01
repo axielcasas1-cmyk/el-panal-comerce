@@ -1,0 +1,12 @@
+{
+  "version": "ES-1.0",
+  "reviewedAt": "2026-09-01",
+  "sources": [
+    {"key":"aesan_bedca_context","title":"BEDCA - Base de datos española de composición de alimentos","organization":"Agencia Española de Seguridad Alimentaria y Nutrición (AESAN)","locator":"https://aesan.gob.es/va/ambito-cientifico/evaluacion-de-riesgos/procedimientos/datos-evaluacion","sourceClass":"official","country":"ES","accessedAt":"2026-09-01","reviewedAt":"2026-09-01","confidence":"HIGH"},
+    {"key":"eu_1169_annex_ii","title":"Reglamento (UE) n.º 1169/2011, Anexo II","organization":"EUR-Lex / Unión Europea","locator":"https://eur-lex.europa.eu/legal-content/ES/ALL/?uri=celex:32011R1169","sourceClass":"official","country":null,"accessedAt":"2026-09-01","reviewedAt":"2026-09-01","confidence":"VERIFIED"},
+    {"key":"aesan_1169_consolidated","title":"Reglamento 1169/2011 consolidado - información alimentaria","organization":"Agencia Española de Seguridad Alimentaria y Nutrición (AESAN)","locator":"https://www.aesan.gob.es/AECOSAN/docs/documentos/seguridad_alimentaria/gestion_riesgos/R1169-2011_consolidado.pdf","sourceClass":"official","country":"ES","accessedAt":"2026-09-01","reviewedAt":"2026-09-01","confidence":"HIGH"},
+    {"key":"mapa_hortalizas_temporada","title":"Hortalizas de Temporada","organization":"Ministerio de Agricultura, Pesca y Alimentación (MAPA)","locator":"https://www.mapa.gob.es/es/alimentacion/temas/desperdicio/11calendario_verduras_completo_tcm30-623767.pdf","sourceClass":"official","country":"ES","accessedAt":"2026-09-01","reviewedAt":"2026-09-01","confidence":"HIGH"},
+    {"key":"aesan_cc32_nutrition","title":"Revista del Comité Científico de la AESAN n.º 32","organization":"Agencia Española de Seguridad Alimentaria y Nutrición (AESAN)","locator":"https://www.aesan.gob.es/AECOSAN/docs/documentos/publicaciones/revistas_comite_cientifico/comite_cientifico_32.pdf","sourceClass":"scientific","country":"ES","accessedAt":"2026-09-01","reviewedAt":"2026-09-01","confidence":"HIGH"},
+    {"key":"dgusteaux_culinary_review_v1","title":"D’GUSTEAUX Culinary Review v1","organization":"D’GUSTEAUX","locator":"internal://dgusteaux/culinary-review/v1","sourceClass":"technical","country":"ES","accessedAt":"2026-09-01","reviewedAt":"2026-09-01","confidence":"MEDIUM"}
+  ]
+}
