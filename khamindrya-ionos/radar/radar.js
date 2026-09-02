@@ -15,7 +15,12 @@
     return {
       version: 1,
       channels: CHANNELS.map(([key,name,kind]) => ({id:key,key,name,kind,status:'NOT_CONNECTED',statusDetail:'Sin conector autenticado; sin datos.',handle:'',url:'',verified:false,lastSyncAt:null})),
-      campaigns: [{id:'book1-launch',title:'KHAMINDRYA — Libro I — Y el Nacimiento de las Aguas',author:'D’Ax',price:4.99,market:'España / global',status:'DRAFT',goal:'Libro II terminado y listo en 30 días o antes',goalDeadline:''}],
+      campaigns: [{id:'book1-launch',title:'KHAMINDRYA — Libro I — Y el Nacimiento de las Aguas',author:'D’Ax',price:4.99,market:'España / global',status:'PUBLISHED',goal:'Libro II terminado y listo en 30 días o antes',goalDeadline:''}],
+      distribution: [
+        {id:'dist-amazon',store:'Amazon Books',status:'SUBMITTED',price:4.99,url:'',note:'Publicación declarada por el autor; disponibilidad pública pendiente de verificación.'},
+        {id:'dist-kobo',store:'Kobo',status:'SUBMITTED',price:4.99,url:'',note:'Publicación declarada por el autor; disponibilidad pública pendiente de verificación.'},
+        {id:'dist-google',store:'Google Play Books',status:'SUBMITTED',price:4.99,url:'',note:'Publicación declarada por el autor; disponibilidad pública pendiente de verificación.'}
+      ],
       queue: [], assets: [], markets: [], activity: [],
       settings: {syncIntervalMinutes:60,lastSyncAt:null,watermark:null,watermarkName:'',watermarkOpacity:0.16}
     };
@@ -27,7 +32,7 @@
     state.settings = {...base.settings,...(raw.settings||{})};
     const byKey = new Map((Array.isArray(raw.channels)?raw.channels:[]).map(c=>[c.key,c]));
     state.channels = base.channels.map(c=>({...c,...(byKey.get(c.key)||{})}));
-    for (const k of ['campaigns','queue','assets','markets','activity']) if (!Array.isArray(state[k])) state[k]=[];
+    for (const k of ['campaigns','distribution','queue','assets','markets','activity']) if (!Array.isArray(state[k])) state[k]=[];
     return state;
   }
   function syncState(input, nowValue) {
