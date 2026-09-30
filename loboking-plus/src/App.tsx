@@ -422,7 +422,7 @@ function RoutesModule({ data, refreshAfter }: any) {
   })}
   return <Section kicker="TARGET LOGISTICS" title="Rutas y destinos" text="Cada bebé puede mantener varias rutas independientes.">
     <div className="two-col"><form className="panel form-stack" onSubmit={submit}><h3>NUEVA RUTA</h3>
-      <AssetSelect assets={data.assets} value={form.asset_id} onChange={v=>setForm({...form,asset_id:v})}/>
+      <AssetSelect assets={data.assets} value={form.asset_id} onChange={(v:string)=>setForm({...form,asset_id:v})}/>
       <select value={form.route_type} onChange={e=>setForm({...form,route_type:e.target.value})}>{routeTypes.map(x=><option key={x}>{x}</option>)}</select>
       <select value={form.money_horizon} onChange={e=>setForm({...form,money_horizon:e.target.value})}>{horizons.map(x=><option key={x}>{x}</option>)}</select>
       <input placeholder="Empresa / destino / concurso" value={form.destination_name} onChange={e=>setForm({...form,destination_name:e.target.value})}/>
@@ -454,7 +454,7 @@ function BusinessModule({ data, refreshAfter }: any) {
     <div className="two-col"><form className="panel form-stack" onSubmit={submit}><h3>NUEVA OPORTUNIDAD</h3>
       <input required placeholder="Oportunidad" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
       <input placeholder="Empresa" value={form.company} onChange={e=>setForm({...form,company:e.target.value})}/>
-      <AssetSelect assets={data.assets} value={form.asset_id} onChange={v=>setForm({...form,asset_id:v})} optional/>
+      <AssetSelect assets={data.assets} value={form.asset_id} onChange={(v:string)=>setForm({...form,asset_id:v})} optional/>
       <input type="number" min="0" placeholder="Valor €" value={form.value_eur} onChange={e=>setForm({...form,value_eur:e.target.value})}/>
       <input type="number" min="0" max="100" value={form.probability} onChange={e=>setForm({...form,probability:Number(e.target.value)})}/>
       <input placeholder="Próxima acción" value={form.next_action} onChange={e=>setForm({...form,next_action:e.target.value})}/>
@@ -475,7 +475,7 @@ function ShowroomModule({ data, refreshAfter }: any) {
         <button className="primary">Crear sala</button>
       </form>
       <form className="panel form-stack" onSubmit={(e)=>{e.preventDefault();refreshAfter('Ficha Showroom registrada.',async()=>{const{error}=await supabase.from('showroom_entries').upsert(show,{onConflict:'asset_id'});if(error)throw error})}}>
-        <h3>SHOWROOM ENTRY</h3><AssetSelect assets={data.assets} value={show.asset_id} onChange={v=>setShow({...show,asset_id:v})}/>
+        <h3>SHOWROOM ENTRY</h3><AssetSelect assets={data.assets} value={show.asset_id} onChange={(v:string)=>setShow({...show,asset_id:v})}/>
         <input placeholder="Headline" value={show.headline} onChange={e=>setShow({...show,headline:e.target.value})}/>
         <select value={show.disclosure_level} onChange={e=>setShow({...show,disclosure_level:e.target.value})}>{['L0','L1','L2','L3','L4','L5'].map(x=><option key={x}>{x}</option>)}</select>
         <button className="primary" disabled={!show.asset_id}>Guardar ficha</button>
@@ -523,7 +523,7 @@ function LegalModule({ data, refreshAfter }: any) {
   })}
   return <Section kicker="LEGALEX + SIGNATURE VAULT" title="Legal y firma" text="Registrar no equivale a firmar. Toda firma solicita aprobación Headquarters.">
     <div className="two-col"><form className="panel form-stack" onSubmit={submit}><h3>NUEVO DOCUMENTO</h3>
-      <AssetSelect assets={data.assets} value={form.asset_id} onChange={v=>setForm({...form,asset_id:v})} optional/>
+      <AssetSelect assets={data.assets} value={form.asset_id} onChange={(v:string)=>setForm({...form,asset_id:v})} optional/>
       <select value={form.document_type} onChange={e=>setForm({...form,document_type:e.target.value})}>{['NDA','LOI','MOU','CONTRACT','LICENSE','ASSIGNMENT','EXCLUSIVITY','IP','OTHER'].map(x=><option key={x}>{x}</option>)}</select>
       <input required placeholder="Título" value={form.title} onChange={e=>setForm({...form,title:e.target.value})}/>
       <label className="check"><input type="checkbox" checked={form.requires_signature} onChange={e=>setForm({...form,requires_signature:e.target.checked})}/> Requiere firma</label>
@@ -556,7 +556,7 @@ function StratelabModule({ data, refreshAfter }: any) {
     <div className="two-col"><form className="panel form-stack" onSubmit={(e)=>{e.preventDefault();refreshAfter('Señal enviada a Stratelab.',async()=>{
       const{error}=await supabase.from('stratelab_signals').insert({...form,asset_id:form.asset_id||null,confidence:form.confidence?Number(form.confidence):null,evidence_class:'INF'});if(error)throw error
     })}}>
-      <h3>NUEVA SEÑAL</h3><AssetSelect assets={data.assets} value={form.asset_id} onChange={v=>setForm({...form,asset_id:v})} optional/>
+      <h3>NUEVA SEÑAL</h3><AssetSelect assets={data.assets} value={form.asset_id} onChange={(v:string)=>setForm({...form,asset_id:v})} optional/>
       <input value={form.signal_type} onChange={e=>setForm({...form,signal_type:e.target.value})}/>
       <input value={form.source_area} onChange={e=>setForm({...form,source_area:e.target.value})}/>
       <textarea required placeholder="Hallazgo" value={form.summary} onChange={e=>setForm({...form,summary:e.target.value})}/>
@@ -573,7 +573,7 @@ function MigtaxModule({ data, refreshAfter }: any) {
     <div className="two-col"><form className="panel form-stack" onSubmit={(e)=>{e.preventDefault();refreshAfter('Prueba MIGTAX registrada.',async()=>{
       const{error}=await supabase.from('migtax_runs').insert({...form,score:form.score?Number(form.score):null});if(error)throw error
     })}}>
-      <h3>NUEVA PRUEBA</h3><AssetSelect assets={data.assets} value={form.asset_id} onChange={v=>setForm({...form,asset_id:v})}/>
+      <h3>NUEVA PRUEBA</h3><AssetSelect assets={data.assets} value={form.asset_id} onChange={(v:string)=>setForm({...form,asset_id:v})}/>
       <select value={form.test_level} onChange={e=>setForm({...form,test_level:e.target.value})}>{['X3','X9','X21','CUSTOM'].map(x=><option key={x}>{x}</option>)}</select>
       <select value={form.status} onChange={e=>setForm({...form,status:e.target.value})}>{['PENDING','READY','READY_WITH_CONDITIONS','REWORK','HOLD','REJECT'].map(x=><option key={x}>{x}</option>)}</select>
       <input type="number" min="0" max="100" placeholder="Score" value={form.score} onChange={e=>setForm({...form,score:e.target.value})}/>
