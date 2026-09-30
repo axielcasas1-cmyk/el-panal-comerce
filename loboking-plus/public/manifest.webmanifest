@@ -1,0 +1,9 @@
+{
+  "name": "LOBOKING+ Commercial Command OS",
+  "short_name": "LOBOKING+",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07111b",
+  "theme_color": "#07111b",
+  "description": "Plataforma privada de activos, estrategia, ventas, Legalex, agenda y auditoría."
+}
