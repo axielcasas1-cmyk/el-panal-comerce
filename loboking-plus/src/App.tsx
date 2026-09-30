@@ -122,12 +122,21 @@ function OwnerAccess() {
     try {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email: OWNER_EMAIL, password })
-        if (error) throw error
+        if (error) {
+          if (error.message.toLowerCase().includes('invalid login credentials')) {
+            setMessage('La cuenta existe, pero puede faltar confirmar el correo. Pulsa “Reenviar confirmación” y confirma el mensaje recibido en Outlook.')
+            return
+          }
+          throw error
+        }
       } else {
         const { data, error } = await supabase.auth.signUp({
           email: OWNER_EMAIL,
           password,
-          options: { data: { display_name: OWNER_NAME } },
+          options: {
+            data: { display_name: OWNER_NAME },
+            emailRedirectTo: window.location.origin,
+          },
         })
         if (error) throw error
         if (!data.session) {
@@ -140,6 +149,17 @@ function OwnerAccess() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const resendConfirmation = async () => {
+    setBusy(true)
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: OWNER_EMAIL,
+      options: { emailRedirectTo: window.location.origin },
+    })
+    setMessage(error ? error.message : 'Confirmación reenviada a Outlook. Ábrela y pulsa el enlace; después vuelve aquí e inicia sesión.')
+    setBusy(false)
   }
 
   const reset = async () => {
@@ -170,7 +190,10 @@ function OwnerAccess() {
       <button type="button" className="secondary" onClick={() => setMode(mode === 'login' ? 'setup' : 'login')}>
         {mode === 'login' ? 'Primera configuración' : 'Ya tengo cuenta'}
       </button>
-      {mode === 'login' && <button type="button" className="link-button" onClick={reset}>Recuperar contraseña</button>}
+      {mode === 'login' && <>
+        <button type="button" className="secondary" onClick={resendConfirmation}>Reenviar confirmación</button>
+        <button type="button" className="link-button" onClick={reset}>Recuperar contraseña</button>
+      </>}
       <div className="auth-message">{message}</div>
     </form>
   </main>
