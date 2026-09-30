@@ -124,7 +124,7 @@ function OwnerAccess() {
         const { error } = await supabase.auth.signInWithPassword({ email: OWNER_EMAIL, password })
         if (error) {
           if (error.message.toLowerCase().includes('invalid login credentials')) {
-            setMessage('La cuenta existe, pero puede faltar confirmar el correo. Pulsa “Reenviar confirmación” y confirma el mensaje recibido en Outlook.')
+            setMessage('La cuenta OWNER está confirmada. Si esta contraseña no entra, usa “Recuperar contraseña” y define una nueva.')
             return
           }
           throw error
@@ -193,6 +193,7 @@ function OwnerAccess() {
       {mode === 'login' && <>
         <button type="button" className="secondary" onClick={resendConfirmation}>Reenviar confirmación</button>
         <button type="button" className="link-button" onClick={reset}>Recuperar contraseña</button>
+        <small>Si el enlace abre localhost:3000, cambia solo ese dominio por https://loboking-plus.onrender.com y conserva intacto el resto del enlace.</small>
       </>}
       <div className="auth-message">{message}</div>
     </form>
