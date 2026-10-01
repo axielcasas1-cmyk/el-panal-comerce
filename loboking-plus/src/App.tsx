@@ -32,6 +32,8 @@ type DataState = {
   signals: any[]
   migtax: any[]
   mailAccounts: any[]
+  campaigns: any[]
+  evidence: any[]
   audit: any[]
   incidents: any[]
 }
@@ -39,7 +41,7 @@ type DataState = {
 const emptyData: DataState = {
   assets: [], needs: [], routes: [], companies: [], opportunities: [], documents: [],
   buyerRooms: [], showroom: [], events: [], alarms: [], legal: [], approvals: [],
-  finance: [], signals: [], migtax: [], mailAccounts: [], audit: [], incidents: [],
+  finance: [], signals: [], migtax: [], mailAccounts: [], campaigns: [], evidence: [], audit: [], incidents: [],
 }
 
 const nav: Array<{ key: ModuleKey; label: string; icon: any }> = [
@@ -216,7 +218,8 @@ function CommandCenter({ session }: { session: Session }) {
       ['buyerRooms', 'buyer_rooms', 'updated_at'], ['showroom', 'showroom_entries', 'updated_at'], ['events', 'calendar_events', 'starts_at'],
       ['alarms', 'alarms', 'trigger_at'], ['legal', 'legal_documents', 'updated_at'], ['approvals', 'approvals', 'created_at'],
       ['finance', 'finance_transactions', 'created_at'], ['signals', 'stratelab_signals', 'created_at'], ['migtax', 'migtax_runs', 'started_at'],
-      ['mailAccounts', 'mail_accounts', 'updated_at'], ['audit', 'audit_events', 'created_at'], ['incidents', 'system_incidents', 'detected_at'],
+      ['mailAccounts', 'mail_accounts', 'updated_at'], ['campaigns', 'commercial_campaigns', 'updated_at'], ['evidence', 'asset_evidence', 'created_at'],
+      ['audit', 'audit_events', 'created_at'], ['incidents', 'system_incidents', 'detected_at'],
     ]
     const results = await Promise.all(specs.map(async ([key, table, order]) => {
       const q = supabase.from(table).select('*').order(order, { ascending: false }).limit(key === 'audit' ? 100 : 250)
@@ -484,6 +487,10 @@ function BusinessModule({ data, refreshAfter }: any) {
       <input placeholder="Próxima acción" value={form.next_action} onChange={e=>setForm({...form,next_action:e.target.value})}/>
       <button className="primary">Crear oportunidad</button>
     </form><Panel title="PIPELINE"><Rows items={data.opportunities} empty="Sin oportunidades." render={(x:any)=><><strong>{x.title}</strong><span>{x.stage} · {x.value_eur ? money(x.value_eur) : 'sin valoración'} · {x.probability ?? 0}%</span></>}/></Panel></div>
+    <div className="two-col">
+      <Panel title="CAMPAÑAS VERIFICADAS"><Rows items={data.campaigns} empty="Sin campañas." render={(x:any)=><><strong>{x.name}</strong><span>{x.verified_status || x.claimed_status} · {x.recipient_count || 0} destinatarios · {x.country || 'sin región'}</span><p>{x.next_action || ''}</p></>}/></Panel>
+      <Panel title="EVIDENCIA COMERCIAL"><Rows items={data.evidence} empty="Sin evidencias." render={(x:any)=><><strong>{x.evidence_type} · {x.evidence_class}</strong><span>{x.verified?'VERIFIED':'UNVERIFIED'} · {prettyDate(x.created_at)}</span><p>{x.note || ''}</p></>}/></Panel>
+    </div>
   </Section>
 }
 
@@ -532,6 +539,7 @@ function CalendarModule({ data, upcoming, pendingAlarms, refreshAfter }: any) {
       <select value={form.alarm_type} onChange={e=>setForm({...form,alarm_type:e.target.value})}>{['REMINDER','ACTION','CRITICAL','HEADQUARTERS'].map(x=><option key={x}>{x}</option>)}</select>
       <button className="primary">Guardar todo</button>
     </form><div><Panel title="PRÓXIMOS EVENTOS"><EventList items={upcoming}/></Panel><Panel title="ALARMAS"><Rows items={pendingAlarms} empty="Sin alarmas." render={(x:any)=><><strong>{x.alarm_type} · {x.message}</strong><span>{prettyDate(x.trigger_at)}</span><button className="mini" onClick={()=>ack(x.id)}>Reconocer</button></>}/></Panel></div></div>
+    <Panel title="FOLLOW-UPS HEREDADOS / ATRASADOS"><Rows items={data.events.filter((x:any)=>x.status==='OVERDUE')} empty="Sin follow-ups atrasados." render={(x:any)=><><strong>{x.title}</strong><span>{prettyDate(x.starts_at)} · {x.source_type}</span></>}/></Panel>
   </Section>
 }
 
