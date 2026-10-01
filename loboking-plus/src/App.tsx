@@ -609,14 +609,74 @@ function MigtaxModule({ data, refreshAfter }: any) {
 
 function MailModule({ data, refreshAfter }: any) {
   const [form,setForm]=useState({label:'Correo comercial A',email_address:'',provider:'GMAIL_APPS_SCRIPT',direction_mode:'BIDIRECTIONAL',status:'PENDING'})
-  return <Section kicker="UNIFIED COMMERCIAL MAIL HUB" title="Correo dual" text="La base está lista. Hasta instalar el puente Apps Script, el estado permanece SETUP REQUIRED / PENDING.">
+  const [connector,setConnector]=useState<any>(null)
+  const [busyAccount,setBusyAccount]=useState('')
+
+  const generateToken=async(account:any)=>{
+    setBusyAccount(account.id)
+    setConnector(null)
+    const {data:result,error}=await supabase.functions.invoke('mail-token',{body:{accountId:account.id}})
+    setBusyAccount('')
+    if(error){alert(error.message);return}
+    if(!result?.ok){alert(result?.error || 'No se pudo generar el token.');return}
+    setConnector({...result,accountLabel:account.label})
+  }
+
+  const setCalendarPrimary=async(account:any)=>{
+    await refreshAfter('Calendar primario actualizado.',async()=>{
+      for(const item of data.mailAccounts){
+        const selected=item.id===account.id
+        const {error}=await supabase.from('mail_accounts').update({
+          is_calendar_primary:selected,
+          calendar_enabled:selected,
+          updated_at:new Date().toISOString()
+        }).eq('id',item.id)
+        if(error)throw error
+      }
+    })
+  }
+
+  const copyText=async(value:string)=>{
+    try{await navigator.clipboard.writeText(value)}catch{}
+  }
+
+  return <Section kicker="UNIFIED COMMERCIAL MAIL HUB" title="Correo dual" text="Gmail A/B comparten una sola bandeja lógica, conservando cuenta de origen y salida. Hasta instalar Apps Script, el estado permanece PENDING.">
     <div className="two-col"><form className="panel form-stack" onSubmit={(e)=>{e.preventDefault();refreshAfter('Registro de buzón creado; sincronización externa todavía pendiente.',async()=>{
       const{error}=await supabase.from('mail_accounts').insert(form);if(error)throw error
     })}}>
       <h3>REGISTRAR BUZÓN</h3><input required placeholder="Etiqueta" value={form.label} onChange={e=>setForm({...form,label:e.target.value})}/>
       <input required type="email" placeholder="correo@gmail.com" value={form.email_address} onChange={e=>setForm({...form,email_address:e.target.value})}/>
       <button className="primary">Preparar conector</button>
-    </form><Panel title="ESTADO"><Rows items={data.mailAccounts} empty="SETUP REQUIRED · no hay buzones conectados." render={(x:any)=><><strong>{x.label}</strong><span>{x.email_address} · {x.status} · sync {prettyDate(x.last_sync_at)}</span></>}/></Panel></div>
+      <a className="secondary connector-link" href="/gmail-bridge-template.txt" target="_blank" rel="noreferrer">Abrir plantilla Apps Script</a>
+    </form>
+    <Panel title="CUENTAS COMERCIALES">
+      <Rows items={data.mailAccounts} empty="SETUP REQUIRED · no hay buzones registrados." render={(x:any)=><>
+        <strong>{x.label} · {x.email_address}</strong>
+        <span>{x.status} · sync {prettyDate(x.last_sync_at)} · Calendar {x.is_calendar_primary?'PRIMARY':'OFF'}</span>
+        <code className="account-code">ACCOUNT_ID: {x.id}</code>
+        <div className="inline-buttons">
+          <button className="mini good" disabled={busyAccount===x.id} onClick={()=>generateToken(x)}>{busyAccount===x.id?'Generando…':'Generar / rotar token'}</button>
+          <button className="mini" disabled={x.is_calendar_primary} onClick={()=>setCalendarPrimary(x)}>{x.is_calendar_primary?'Calendar primario':'Usar para Calendar'}</button>
+          <button className="mini" onClick={()=>copyText(x.id)}>Copiar ID</button>
+        </div>
+      </>}/>
+    </Panel></div>
+
+    {connector && <article className="panel connector-box">
+      <h3>CONNECTOR TOKEN · SOLO ESTA VEZ</h3>
+      <p>Cuenta: <strong>{connector.accountLabel} · {connector.email}</strong></p>
+      <small>Guárdalo directamente en Apps Script. LOBOKING+ conserva solo su SHA-256 y no puede volver a mostrar este mismo token.</small>
+      <label>ACCOUNT_ID</label>
+      <code className="token-box">{connector.accountId}</code>
+      <button className="mini" onClick={()=>copyText(connector.accountId)}>Copiar ACCOUNT_ID</button>
+      <label>CONNECTOR_TOKEN</label>
+      <code className="token-box">{connector.connectorToken}</code>
+      <button className="mini good" onClick={()=>copyText(connector.connectorToken)}>Copiar token</button>
+      <label>BRIDGE_URL</label>
+      <code className="token-box">{connector.bridgeUrl}</code>
+      <a className="secondary connector-link" href="/gmail-bridge-template.txt" target="_blank" rel="noreferrer">Abrir plantilla Apps Script</a>
+    </article>}
+
     <div className="truth-banner"><LockKeyhole size={17}/><div><strong>WhatsApp Gateway</strong><span>LOCKED · arquitectura reservada, sin conexión ficticia.</span></div></div>
   </Section>
 }
