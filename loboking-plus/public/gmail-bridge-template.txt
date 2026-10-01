@@ -1,0 +1,182 @@
+/**
+ * LOBOKING+ · Gmail / Calendar Bridge
+ * 1) Abre script.google.com con la cuenta Gmail que vas a conectar.
+ * 2) Crea un proyecto nuevo y pega este archivo.
+ * 3) Rellena ACCOUNT_ID, ACCOUNT_EMAIL y CONNECTOR_TOKEN con los valores mostrados por LOBOKING+.
+ * 4) Ejecuta install() una sola vez y concede permisos.
+ * 5) Después usa runSync() para una prueba manual.
+ */
+
+const CONFIG = {
+  BRIDGE_URL: 'https://woagmtojktiewilshrmj.supabase.co/functions/v1/mail-bridge',
+  ACCOUNT_ID: 'PEGAR_ACCOUNT_ID',
+  ACCOUNT_EMAIL: 'PEGAR_CORREO_GMAIL',
+  CONNECTOR_TOKEN: 'PEGAR_CONNECTOR_TOKEN',
+  INBOX_LOOKBACK_DAYS: 3,
+  MAX_INBOUND_PER_RUN: 60
+};
+
+function install() {
+  validateConfig_();
+  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('runSync').timeBased().everyMinutes(5).create();
+  PropertiesService.getScriptProperties().setProperty('LAST_SYNC_MS', String(Date.now() - 24 * 60 * 60 * 1000));
+  runSync();
+}
+
+function runSync() {
+  validateConfig_();
+  syncInbox_();
+  flushEmailOutbox_();
+  flushCalendarOutbox_();
+}
+
+function syncInbox_() {
+  const props = PropertiesService.getScriptProperties();
+  const lastSync = Number(props.getProperty('LAST_SYNC_MS') || 0);
+  const query = 'newer_than:' + CONFIG.INBOX_LOOKBACK_DAYS + 'd';
+  const threads = GmailApp.search(query, 0, 100);
+  const rows = [];
+
+  for (const thread of threads) {
+    for (const message of thread.getMessages()) {
+      const when = message.getDate().getTime();
+      if (when <= lastSync) continue;
+      const from = String(message.getFrom() || '');
+      if (from.toLowerCase().includes(CONFIG.ACCOUNT_EMAIL.toLowerCase())) continue;
+
+      rows.push({
+        externalMessageId: message.getId(),
+        threadId: thread.getId(),
+        sender: from,
+        recipients: String(message.getTo() || ''),
+        subject: String(message.getSubject() || ''),
+        bodyPreview: String(message.getPlainBody() || '').slice(0, 4000),
+        receivedAt: message.getDate().toISOString(),
+        needsReply: true
+      });
+
+      if (rows.length >= CONFIG.MAX_INBOUND_PER_RUN) break;
+    }
+    if (rows.length >= CONFIG.MAX_INBOUND_PER_RUN) break;
+  }
+
+  if (rows.length) postBridge_({ action: 'INBOUND', messages: rows });
+  props.setProperty('LAST_SYNC_MS', String(Date.now()));
+}
+
+function flushEmailOutbox_() {
+  const poll = postBridge_({ action: 'POLL' });
+  const items = poll.emailOutbox || [];
+
+  for (const item of items) {
+    try {
+      const options = {};
+      if (item.recipient_cc) options.cc = item.recipient_cc;
+      if (item.recipient_bcc) options.bcc = item.recipient_bcc;
+
+      const sent = GmailApp.createDraft(item.recipient_to, item.subject, item.body_text, options).send();
+
+      postBridge_({
+        action: 'ACK',
+        kind: 'EMAIL',
+        id: item.id,
+        success: true,
+        externalId: sent.getId(),
+        threadId: sent.getThread().getId()
+      });
+    } catch (err) {
+      postBridge_({
+        action: 'ACK',
+        kind: 'EMAIL',
+        id: item.id,
+        success: false,
+        error: String(err)
+      });
+    }
+  }
+}
+
+function flushCalendarOutbox_() {
+  const poll = postBridge_({ action: 'POLL' });
+  const items = poll.calendarOutbox || [];
+  const calendar = CalendarApp.getDefaultCalendar();
+
+  for (const item of items) {
+    try {
+      const eventData = item.calendar_events;
+      if (!eventData) throw new Error('calendar_event_missing');
+
+      if (String(item.operation || 'UPSERT').toUpperCase() === 'DELETE') {
+        const existing = calendar.getEventById(item.external_event_id || '');
+        if (existing) existing.deleteEvent();
+        postBridge_({
+          action: 'ACK',
+          kind: 'CALENDAR',
+          id: item.id,
+          success: true,
+          externalId: item.external_event_id || null
+        });
+        continue;
+      }
+
+      const start = new Date(eventData.starts_at);
+      const end = eventData.ends_at ? new Date(eventData.ends_at) : new Date(start.getTime() + 60 * 60 * 1000);
+
+      const options = {
+        description: [
+          'LOBOKING+',
+          'Tipo: ' + (eventData.event_type || 'GENERAL'),
+          eventData.meeting_url ? 'Meeting: ' + eventData.meeting_url : ''
+        ].filter(Boolean).join('\n'),
+        location: eventData.location || ''
+      };
+
+      const event = calendar.createEvent(eventData.title, start, end, options);
+
+      postBridge_({
+        action: 'ACK',
+        kind: 'CALENDAR',
+        id: item.id,
+        success: true,
+        externalId: event.getId()
+      });
+    } catch (err) {
+      postBridge_({
+        action: 'ACK',
+        kind: 'CALENDAR',
+        id: item.id,
+        success: false,
+        error: String(err)
+      });
+    }
+  }
+}
+
+function postBridge_(payload) {
+  payload.accountId = CONFIG.ACCOUNT_ID;
+  payload.token = CONFIG.CONNECTOR_TOKEN;
+
+  const response = UrlFetchApp.fetch(CONFIG.BRIDGE_URL, {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+
+  const code = response.getResponseCode();
+  const text = response.getContentText() || '{}';
+  let data;
+  try { data = JSON.parse(text); } catch (_) { data = { ok: false, error: text }; }
+
+  if (code < 200 || code >= 300 || data.ok === false) {
+    throw new Error('LOBOKING bridge ' + code + ': ' + (data.error || text));
+  }
+  return data;
+}
+
+function validateConfig_() {
+  if (!CONFIG.ACCOUNT_ID || CONFIG.ACCOUNT_ID.indexOf('PEGAR_') === 0) throw new Error('Configura ACCOUNT_ID');
+  if (!CONFIG.ACCOUNT_EMAIL || CONFIG.ACCOUNT_EMAIL.indexOf('PEGAR_') === 0) throw new Error('Configura ACCOUNT_EMAIL');
+  if (!CONFIG.CONNECTOR_TOKEN || CONFIG.CONNECTOR_TOKEN.indexOf('PEGAR_') === 0) throw new Error('Configura CONNECTOR_TOKEN');
+}
